@@ -1,7 +1,9 @@
 package com.nlu.store.modules.user.impl;
 
+import com.nlu.store.core.cache.Cache;
 import com.nlu.store.core.config.PropertySource;
 import com.nlu.store.core.data.ULID;
+import com.nlu.store.core.exceptions.AuthenticationException;
 import com.nlu.store.core.web.Authentication;
 import com.nlu.store.modules.notification.EmailService;
 import com.nlu.store.modules.user.*;
@@ -9,6 +11,7 @@ import com.nlu.store.modules.user.dao.UserDao;
 import com.nlu.store.modules.user.dto.LoginRequest;
 import com.nlu.store.modules.user.dto.RegisterRequest;
 import com.nlu.store.modules.user.models.AuthPrincipal;
+import com.nlu.store.modules.user.models.Role;
 import com.nlu.store.modules.user.models.User;
 import com.nlu.store.modules.user.services.AuthService;
 import com.nlu.store.modules.user.services.PasswordEncoder;
@@ -16,6 +19,7 @@ import com.nlu.store.modules.user.services.TokenGenerator;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
 
@@ -26,97 +30,73 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TokenGenerator tokenGenerator;
     private final EmailService emailService;
-    private final long verifyTokenAge;
+    private final Duration verifyTokenAge;
+    private final Cache cache;
+    private final Duration verifyRequestCountDown;
+
 
     @Inject
-    public AuthServiceImpl(UserDao userDao, PasswordEncoder passwordEncoder, TokenGenerator tokenGenerator, EmailService emailService, PropertySource config) {
+    public AuthServiceImpl(UserDao userDao, PasswordEncoder passwordEncoder, TokenGenerator tokenGenerator, EmailService emailService, PropertySource config, Cache cache) {
         this.userDao = userDao;
         this.passwordEncoder = passwordEncoder;
         this.tokenGenerator = tokenGenerator;
         this.emailService = emailService;
-        this.verifyTokenAge = config.getLong("auth.verify-token.age", 30);
+        this.verifyTokenAge = config.getDuration("auth.verify-token.age", Duration.ofDays(1));
+        this.cache = cache;
+        this.verifyRequestCountDown = config.getDuration("auth.verify-token.count-down", Duration.ofMinutes(2));
     }
 
     @Override
     public Authentication login(LoginRequest request) {
-        // 1. Tìm User từ Database
-        // Lưu ý: Không throw exception ngay nếu không tìm thấy để tránh lộ thông tin email
         User user = userDao.findByEmail(request.getEmail())
                 .orElse(null);
 
-        // 2. Kiểm tra Credential (Tài khoản & Mật khẩu)
-        // BẢO MẬT: Kết hợp kiểm tra (user == null) VÀ (password không khớp) trong cùng một khối.
-        // Điều này giúp ngăn chặn kẻ tấn công đoán được email nào đã tồn tại trong hệ thống
-        // (User Enumeration Attack) dựa trên thông báo lỗi hoặc thời gian phản hồi.
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new BadCredentialException("auth.login.failed");
         }
 
-        // 3. Kiểm tra trạng thái: Đã bị xóa (Soft Delete)
-        // Nếu user có trường deleted_at khác null, coi như tài khoản không còn tồn tại
         if (user.getDeletedAt() != null) {
             throw new AuthenticationException("auth.account.deleted");
         }
 
-        // 4. Kiểm tra trạng thái: Đang bị khóa (Inactive)
-        // isActive = false nghĩa là admin đã khóa hoặc user chưa kích hoạt
         if (!user.isActive()) {
             throw new AuthenticationException("auth.account.locked");
         }
 
-        // 5. (Tùy chọn) Kiểm tra xác thực Email
-        // Nếu nghiệp vụ yêu cầu bắt buộc phải xác thực email mới cho login:
-        /*
-        if (user.getVerifiedAt() == null) {
-            throw new AuthenticationException("auth.account.not_verified");
-        }
-        */
-
-        // 6. Đăng nhập thành công
-        // Tạo đối tượng AuthPrincipal chứa thông tin user (đã bao gồm Roles do DAO xử lý)
         return new AuthPrincipal(user);
     }
 
     @Override
     public void register(RegisterRequest request) {
-        // 1. Kiểm tra Email đã tồn tại chưa
         if (userDao.existsByEmail(request.getEmail())) {
             throw new UserAlreadyExistsException("auth.register.email_exists");
         }
 
-        // 2. Chuẩn bị dữ liệu
         LocalDateTime now = LocalDateTime.now();
-
-        // Mã hóa mật khẩu
         String encodedPassword = passwordEncoder.encode(request.getPassword());
 
-        // 3. Khởi tạo User mới
         User newUser = User.builder()
-                .id(ULID.fast())                 // Tạo ID mới (Primary Key)
+                .id(ULID.fast())
                 .email(request.getEmail())
                 .passwordHash(encodedPassword)
                 .fullName(request.getFullName())
-                .isActive(true)                // Mặc định false, chờ xác thực email
-                .verifyTokenExpiredAt(null) // Token có hiệu lực 24h
+                .isActive(true)
+                .verifyTokenExpiredAt(null)
                 .createdAt(now)
                 .updatedAt(now)
-
-                // Các trường null/mặc định
                 .verifyToken(null)
                 .deletedAt(null)
                 .verifiedAt(null)
                 .resetPasswordToken(null)
                 .resetPasswordTokenExpiredAt(null)
-                .avatar(null)                   // Có thể set avatar mặc định ở đây nếu muốn
-                .roles(Collections.emptyList()) // Khởi tạo list role rỗng
+                .avatar(null)
+                .roles(Collections.emptyList())
                 .build();
 
-        // 4. Lưu xuống Database
-        // Lưu ý: Trong UserDao.save(), bạn nên có logic để gán Role mặc định (ví dụ: ROLE_USER)
-        // hoặc chèn vào bảng users_roles ngay sau khi insert user.
         userDao.create(newUser);
 
-
+        // Tự động gửi email xác thực ngay sau khi đăng ký (Tùy chọn logic)
+        // requestVerify(newUser.getEmail());
     }
 
 
@@ -144,100 +124,124 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void requestVerify(String email) {
-        // 1. Tìm user
-        // Key: auth.user.not_found
+    public long requestVerify(String email) {
+        // 1. Kiểm tra Rate Limiting (Chống spam)
+        String cacheKey = "auth:verify-req:" + email;
+
+        // Lấy thời điểm được phép gửi tiếp theo từ Cache
+        Long nextAllowedTime = cache.getLong(cacheKey);
+
+        if (nextAllowedTime != null) {
+            long currentTime = System.currentTimeMillis();
+            if (currentTime < nextAllowedTime) {
+                // Nếu chưa đến giờ được gửi -> Trả về số giây còn lại phải chờ
+                return (nextAllowedTime - currentTime) / 1000;
+            }
+        }
+
+        // 2. Logic nghiệp vụ
         User user = userDao.findByEmail(email)
                 .orElseThrow(() -> new AuthenticationException("auth.user.not_found"));
 
-        // 2. Kiểm tra tài khoản bị xóa
-        // Key: auth.account.deleted
         if (user.getDeletedAt() != null) {
             throw new AuthenticationException("auth.account.deleted");
         }
 
-        // 3. Kiểm tra đã xác thực chưa
-        // Key: auth.verify.already_verified
         if (user.getVerifiedAt() != null) {
             throw new AuthenticationException("auth.verify.already_verified");
         }
 
-        // 3. Tạo token mới
         String newToken = tokenGenerator.generate(64);
-        LocalDateTime newExpiry = LocalDateTime.now().plusMinutes(verifyTokenAge); // Gia hạn thêm 24h
+        LocalDateTime newExpiry = LocalDateTime.now().plus(verifyTokenAge);
 
-        // 4. Cập nhật thông tin User
         user.setVerifyToken(newToken);
         user.setVerifyTokenExpiredAt(newExpiry);
-
-        // 5. Lưu xuống DB
         userDao.update(user);
 
-        // 6. Gửi Email (Tích hợp EmailService tại đây)
+        // 3. Gửi Email
         emailService.sendVerifyToken(user.getEmail(), newToken, verifyTokenAge);
+
+        // 4. Cập nhật Cache để chặn spam
+        // Value: Thời điểm (timestamp) được phép gửi lần tới
+        // TTL: Thời gian sống của key trong cache
+        long waitTimeMillis = verifyRequestCountDown.toMillis();
+        long nextTime = System.currentTimeMillis() + waitTimeMillis;
+
+        cache.put(cacheKey, nextTime, verifyRequestCountDown.toSeconds());
+
+        return 0; // 0 nghĩa là thành công, không cần chờ
     }
 
 
     @Override
     public void resetPassword(String token, String newPassword) {
-        // 1. Tìm user bằng token reset
-        // Key: auth.reset_password.invalid_token
         User user = userDao.findByResetToken(token)
                 .orElseThrow(() -> new AuthenticationException("auth.reset_password.invalid_token"));
 
-        // 2. Kiểm tra thời gian hết hạn của token
-        // Key: auth.reset_password.token_expired
         if (user.getResetPasswordTokenExpiredAt().isBefore(LocalDateTime.now())) {
             throw new AuthenticationException("auth.reset_password.token_expired");
         }
 
-        // 3. Cập nhật mật khẩu mới (QUAN TRỌNG: Phải mã hóa)
         user.setPasswordHash(passwordEncoder.encode(newPassword));
-
-        // 4. Xóa token để đảm bảo tính năng "One-time use" (Dùng 1 lần)
         user.setResetPasswordToken(null);
         user.setResetPasswordTokenExpiredAt(null);
 
-
-        // 5. Lưu thay đổi xuống Database
         userDao.update(user);
     }
 
     @Override
     public void requestResetPassword(String email) {
-        // 1. Tìm user trong hệ thống
-        // Key: auth.user.not_found
         User user = userDao.findByEmail(email)
                 .orElseThrow(() -> new AuthenticationException("auth.user.not_found"));
 
-        // 2. Kiểm tra tài khoản bị xóa
-        // Key: auth.account.deleted
         if (user.getDeletedAt() != null) {
             throw new AuthenticationException("auth.account.deleted");
         }
 
-        // 3. Kiểm tra tài khoản chưa kích hoạt (Tùy chọn logic nghiệp vụ)
-        // Nếu tài khoản chưa kích hoạt (chưa verify email), thường sẽ không cho reset pass
-        // Key: auth.account.locked
         if (!user.isActive()) {
             throw new AuthenticationException("auth.account.locked");
         }
 
-        // 4. Tạo token reset mới
+        // Có thể thêm Rate Limiting tương tự requestVerify ở đây nếu muốn
+
         String resetToken = tokenGenerator.generate(64);
 
-        // 5. Cập nhật thông tin User
-        user.setResetPasswordToken(resetToken);
-        // Token reset mật khẩu thường chỉ nên sống ngắn (ví dụ: 15 phút)
-        user.setResetPasswordTokenExpiredAt(LocalDateTime.now().plusMinutes(15));
+        // Token reset pass sống 15 phút
+        Duration resetTokenAge = Duration.ofMinutes(15);
 
-        // 6. Lưu xuống DB
+        user.setResetPasswordToken(resetToken);
+        user.setResetPasswordTokenExpiredAt(LocalDateTime.now().plus(resetTokenAge));
+
         userDao.update(user);
 
-        // 7. Gửi Email (TODO)
-        emailService.sendResetPassword(user.getEmail(), resetToken, verifyTokenAge);
+        // Hoàn thành TODO: Gửi email
+        emailService.sendResetPassword(user.getEmail(), resetToken, resetTokenAge);
+    }
+
+    @Override
+    public long getRequestVerifyCountDown(String email) {
+        // 1. Tạo key cache (Phải trùng khớp với key trong hàm requestVerify)
+        String cacheKey = "auth:verify-req:" + email;
+
+        // 2. Lấy mốc thời gian được phép gửi tiếp theo (Timestamp)
+        Long nextAllowedTime = cache.getLong(cacheKey);
+
+        // 3. Nếu không có trong cache -> Không bị chặn -> Trả về 0
+        if (nextAllowedTime == null) {
+            return 0;
+        }
+
+        // 4. Tính toán thời gian còn lại
+        long currentTime = System.currentTimeMillis();
+
+        // Nếu thời gian hiện tại đã vượt qua mốc cho phép -> Hết giờ chờ -> Trả về 0
+        if (currentTime >= nextAllowedTime) {
+            return 0;
+        }
+
+        // 5. Trả về số giây còn lại (làm tròn)
+        return (nextAllowedTime - currentTime) / 1000;
     }
 
 
 }
-

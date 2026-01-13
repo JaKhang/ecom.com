@@ -1,8 +1,8 @@
 package com.nlu.store.modules.user.dao;
 
-import com.nlu.store.core.dao.ResultSetExtractor;
-import com.nlu.store.core.dao.ResultSetReader;
-import com.nlu.store.core.dao.RowMapper;
+import com.nlu.store.core.jdbc.ResultSetExtractor;
+import com.nlu.store.core.jdbc.ResultSetReader;
+import com.nlu.store.core.jdbc.RowMapper;
 import com.nlu.store.core.data.ULID;
 import com.nlu.store.modules.user.models.User;
 import com.nlu.store.modules.user.models.Role;
@@ -73,7 +73,7 @@ public class UsersExtractor implements ResultSetExtractor<List<User>> {
 
             // 3. Kiểm tra xem dòng này có Role không
             // Dùng roleIdColumnLabel được cấu hình (ví dụ: "r_id") để kiểm tra
-            ULID roleId = reader.getULID(roleMapper.getPrefix() + "id");
+            ULID roleId = reader.getULID(roleMapper.prefix() + "id");
 
             if (roleId != null) {
                 // Gọi roleMapper. Lưu ý: roleMapper cần tự biết cách đọc cột của nó

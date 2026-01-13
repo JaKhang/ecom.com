@@ -2,7 +2,12 @@ package com.nlu.store.core.jawire;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nlu.store.core.data.ULID;
+import com.nlu.store.core.web.ServletHttpContext;
+import com.nlu.store.core.web.WebInfrastructure;
 import jakarta.enterprise.inject.spi.CDI;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.jsp.JspException;
 import jakarta.servlet.jsp.JspWriter;
 import jakarta.servlet.jsp.PageContext;
@@ -10,23 +15,25 @@ import jakarta.servlet.jsp.tagext.SimpleTagSupport;
 import lombok.Setter;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 
 @Setter
 public class JawireTag extends SimpleTagSupport {
 
     private String component; // Tên class component được truyền vào từ attribute
+    private String id;
 
     @Override
     public void doTag() throws JspException, IOException {
         try {
+            PageContext pageContext = (PageContext) getJspContext();
             // 1. Setup CDI & Component
-            ObjectMapper mapper = CDI.current().select(ObjectMapper.class).get();
+            WebInfrastructure webInfrastructure = CDI.current().select(WebInfrastructure.class).get();
+            ObjectMapper mapper = webInfrastructure.objectMapper().copy();
 
             Class<?> clazz = Class.forName(component);
             Component instance = (Component) CDI.current().select(clazz).get();
-            injectMapper(instance, mapper);
-
+            instance.setHttpContext(new ServletHttpContext((HttpServletRequest) pageContext.getRequest(), (HttpServletResponse) pageContext.getResponse(), webInfrastructure));
+            instance.setId(id == null ? ULID.fast().toString() : id);
             // 2. Lifecycle
             instance.mount();
             instance.boot();
@@ -34,17 +41,16 @@ public class JawireTag extends SimpleTagSupport {
 
             // 3. Prepare Snapshot
             Component.JawireResponse snapshot = instance.dehydrate();
-            String jsonSnapshot = mapper.writeValueAsString(snapshot).replace("\"", "&quot;");
 
+            String jsonSnapshot = mapper.writeValueAsString(snapshot);
             // --- BẮT ĐẦU SỬA ---
 
             // Lấy Context và Writer ra biến để dùng chung
-            PageContext pageContext = (PageContext) getJspContext();
             JspWriter out = pageContext.getOut();
 
             // 4. Render thẻ mở
             pageContext.getOut().write(String.format(
-                    "<div id=\"%s\" jw-snapshot=\"%s\">",
+                    "<div id=\"%s\" jw-snapshot='%s'>",
                     instance.getId(), // ID duy nhất
                     jsonSnapshot
             ));
@@ -57,9 +63,9 @@ public class JawireTag extends SimpleTagSupport {
             out.flush();
 
             // 5. Include View
-            JawireViewResolver viewResolver = (JawireViewResolver) CDI.current().select(JawireViewResolver.class).get();
+            JawireViewResolver viewResolver = CDI.current().select(JawireViewResolver.class).get();
             String viewPath = viewResolver.resolve(instance.view());
-            System.out.println(viewPath);
+
             // Kiểm tra đường dẫn an toàn
             if (viewPath != null && !viewPath.isEmpty()) {
                 pageContext.include(viewPath);
@@ -70,17 +76,10 @@ public class JawireTag extends SimpleTagSupport {
             // 6. Render thẻ đóng
             out.write("</div>");
 
-            // --- KẾT THÚC SỬA ---
-
         } catch (Exception e) {
             throw new JspException("Error rendering Livewire component: " + component, e);
         }
     }
 
-    // Helper: Inject Mapper (giống bên Servlet)
-    private void injectMapper(Component component, ObjectMapper mapper) throws Exception {
-        Field field = Component.class.getDeclaredField("mapper");
-        field.setAccessible(true);
-        field.set(component, mapper);
-    }
+
 }

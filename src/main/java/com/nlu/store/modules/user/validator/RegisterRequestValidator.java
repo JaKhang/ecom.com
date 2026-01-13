@@ -15,32 +15,33 @@ public class RegisterRequestValidator implements Validator<RegisterRequest> {
 
         if (request == null) {
             SimpleValidateResult result = new SimpleValidateResult(RegisterRequest.class);
-            result.addError("request", "validate.request.null");
+            result.addError("request", "validation.request.null");
             return result;
         }
 
+
         return ValidateHelper.of(request)
                 // 1. Email
-                .notBlank("email", "validate.auth.email.required")
-                .maxLength("email", 255, "validate.auth.email.max_length")
-                .isEmail("email", "validate.auth.email.invalid_format")
+                .notBlank("email", "validation.auth.email.required")
+                .maxLength("email", 255, "validation.auth.email.max_length")
+                .isEmail("email", "validation.auth.email.invalid_format")
 
                 // 2. FullName
-                .notBlank("fullName", "validate.auth.fullname.required")
-                .maxLength("fullName", 100, "validate.auth.fullname.max_length")
+                .notBlank("fullName", "validation.auth.fullname.required")
+                .maxLength("fullName", 100, "validation.auth.fullname.max_length")
 
                 // 3. Password
-                .notBlank("password", "validate.auth.password.required")
-                .minLength("password", 6, "validate.auth.password.min_length")
-                .maxLength("password", 64, "validate.auth.password.max_length")
+                .notBlank("password", "validation.auth.password.required")
+                .minLength("password", 6, "validation.auth.password.min_length")
+                .maxLength("password", 64, "validation.auth.password.max_length")
 
                 // 4. Confirm Password
-                .notBlank("confirmPassword", "validate.auth.confirm_password.required")
+                .notBlank("confirmPassword", "validation.auth.confirm_password.required")
                 // Custom check: so sánh giá trị confirmPassword (val) với request.password()
                 .check("confirmPassword",
-                        val -> val != null && val.equals(request.getConfirmPassword()),
-                        "validate.auth.password.not_match")
-                .check("agree", Boolean.TRUE::equals, "validate.auth.agree.must_check")
+                        val -> val != null && val.equals(request.getPassword()),
+                        "validation.auth.password.not_match")
+                .check("agree", Boolean.TRUE::equals, "validation.auth.agree.must_check")
 
                 .validate();
     }

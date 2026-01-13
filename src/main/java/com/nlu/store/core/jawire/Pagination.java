@@ -1,6 +1,12 @@
 package com.nlu.store.core.jawire;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.nlu.store.core.data.Page;
+import com.nlu.store.core.data.PageRequest;
+import com.nlu.store.core.data.Pageable;
+import com.nlu.store.core.data.Sort;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -16,20 +22,31 @@ import java.util.function.Consumer;
 public abstract class Pagination<T> extends Component implements Iterable<T> {
 
     // --- STATE ---
+    @Model
     private int page = 1;
-    private int limit = 10; // Tên mới (trước là pageSize)
+
+    @Model
+    private int limit = 10;
+    @Model
+    private String sort;
+    @Model
     private long totalItems = 0;
 
+
+    @JsonIgnore
     private List<T> data = new ArrayList<>();
 
     // --- ABSTRACT ---
-    public abstract void loadData();
+    public abstract Page<T> getPage(Pageable pageable);
 
     // --- LIFECYCLE ---
     @Override
     public void mount() {
         if (this.page < 1) this.page = 1;
-        this.loadData();
+        Pageable pageable = getHttpContext().getPageable();
+        this.page = pageable.getPage();
+        this.sort = pageable.getSort().isUnsorted() ? defaultSort().toString() : pageable.getSort().toString();
+        this.limit = pageable.getLimit();
     }
 
     // --- GETTERS & SETTERS (Data) ---
@@ -38,9 +55,6 @@ public abstract class Pagination<T> extends Component implements Iterable<T> {
         return data != null ? data : Collections.emptyList();
     }
 
-    public void setData(List<T> data) {
-        this.data = data;
-    }
 
     // --- GETTERS & SETTERS (Config) ---
 
@@ -52,12 +66,19 @@ public abstract class Pagination<T> extends Component implements Iterable<T> {
         this.page = Math.max(1, page);
     }
 
+    public String getSort() {
+        return sort;
+    }
+
+    public void setSort(String sort) {
+        this.sort = sort;
+    }
+
     public int getLimit() {
         return limit;
     }
 
     public void setLimit(int limit) {
-        // Đảm bảo limit luôn > 0
         this.limit = (limit < 1) ? 10 : limit;
     }
 
@@ -65,38 +86,38 @@ public abstract class Pagination<T> extends Component implements Iterable<T> {
         return totalItems;
     }
 
-    public void setTotalItems(long totalItems) {
-        this.totalItems = Math.max(0, totalItems);
-    }
 
     // --- ACTIONS ---
 
+    @Action
     public void gotoPage(int pageNumber) {
         int maxPage = getTotalPages();
         if (pageNumber < 1) pageNumber = 1;
         if (maxPage > 0 && pageNumber > maxPage) pageNumber = maxPage;
 
         this.page = pageNumber;
-        this.loadData();
     }
 
+    @Action
     public void previousPage() {
         if (hasPrevious()) gotoPage(this.page - 1);
     }
 
+    @Action
     public void nextPage() {
         if (hasNext()) gotoPage(this.page + 1);
     }
 
+    @Action
     public void resetPage() {
         this.page = 1;
-        this.loadData();
     }
 
     /**
      * Thay đổi số lượng dòng hiển thị và reset về trang 1.
      * Dùng cho Dropdown "Show 10/20/50 items".
      */
+    @Action
     public void changeLimit(int newLimit) {
         this.setLimit(newLimit);
         this.resetPage();
@@ -155,5 +176,31 @@ public abstract class Pagination<T> extends Component implements Iterable<T> {
     @Override
     public void forEach(Consumer<? super T> action) {
         getData().forEach(action);
+    }
+
+    @Override
+    public void rendering() {
+        super.rendering();
+        Page<T> pageData = this.getPage(new PageRequest(page, limit, Sort.parse(sort)));
+        if (pageData == null){
+            data = Collections.emptyList();
+            totalItems = 0;
+            page = 1;
+        } else {
+            totalItems = pageData.totalElements();
+            data = pageData.getContent();
+            page = pageData.getPage();
+        }
+
+    }
+
+    protected Sort defaultSort() {
+        return Sort.UNSORTED;
+    }
+
+    @Override
+    protected void clear() {
+        data = Collections.emptyList();
+
     }
 }

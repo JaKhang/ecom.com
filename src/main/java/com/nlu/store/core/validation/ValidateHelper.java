@@ -138,6 +138,7 @@ public class ValidateHelper<T> {
 
     /**
      * Check tùy chỉnh.
+     *
      * @param predicate: Lambda nhận vào giá trị của field (Object) và trả về boolean.
      */
     public ValidateHelper<T> check(String field, Predicate<Object> predicate, String message) {
@@ -145,8 +146,60 @@ public class ValidateHelper<T> {
         return validate(field, predicate.test(val), message);
     }
 
+    // Thêm vào class ValidateHelper<T>
+
+    /**
+     * Validate một object con nằm trong object hiện tại.
+     *
+     * @param field           Tên field chứa object con (ví dụ: "address").
+     * @param nestedValidator Validator dành riêng cho object con đó.
+     * @param <N>             Kiểu dữ liệu của object con.
+     */
+    public <N> ValidateHelper<T> nested(String field, Validator<N> nestedValidator) {
+        Object nestedValue = getFieldValue(field);
+
+        if (nestedValue == null) {
+            return this;
+        }
+
+        // 3. Ép kiểu an toàn và chạy validator con
+        @SuppressWarnings("unchecked")
+        ValidateResult nestedResult = nestedValidator.validate((N) nestedValue);
+
+        if (nestedResult.hasError()) {
+            nestedResult.details().forEach((subField, message) -> {
+                String fullPath = field + "." + subField; // Tạo key: "address.city"
+                // Thêm vào map lỗi của cha
+                if (!result.details().containsKey(fullPath)) {
+                    result.details().put(fullPath, message);
+                }
+            });
+        }
+
+        return this;
+    }
+
+
     public SimpleValidateResult validate() {
         return result;
+    }
+
+    public ValidateHelper<T> pattern(String field, String regex, String message) {
+        if (result.hasError()) return this;
+
+        Object value = getFieldValue(field);
+
+        // 2. Chỉ validate nếu value tồn tại và là String
+        // (Nếu value null, ta coi là hợp lệ ở bước này. Muốn bắt buộc phải dùng .notBlank() trước)
+        if (value instanceof String strValue) {
+
+            // 3. Kiểm tra: Nếu KHÔNG khớp pattern -> Báo lỗi
+            if (!strValue.matches(regex)) {
+                result.addError(field, message);
+            }
+        }
+
+        return this;
     }
 }
 

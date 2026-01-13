@@ -54,7 +54,7 @@ public class DefaultPage<T> implements Page<T> {
     }
 
     @Override
-    public Collection<T> getContent() {
+    public List<T> getContent() {
         return content;
     }
 

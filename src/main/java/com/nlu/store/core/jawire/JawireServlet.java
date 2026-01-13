@@ -2,13 +2,16 @@ package com.nlu.store.core.jawire;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.nlu.store.core.utils.ReflectionUtils;
+import com.nlu.store.core.web.AbstractController;
+import com.nlu.store.core.web.HttpContext;
 import jakarta.enterprise.inject.spi.CDI;
 import jakarta.inject.Inject;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.WriteListener;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletResponseWrapper;
@@ -35,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * </p>
  */
 @WebServlet(name = "JawireServlet", urlPatterns = "/jawire/update")
-public class JawireServlet extends HttpServlet {
+public class JawireServlet extends AbstractController {
 
     private static final Logger logger = LoggerFactory.getLogger(JawireServlet.class);
 
@@ -50,12 +53,12 @@ public class JawireServlet extends HttpServlet {
     private ObjectMapper mapper;
 
     @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        req.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    protected void doPost(HttpContext ctx) {
+        ctx.getResponse().setCharacterEncoding(StandardCharsets.UTF_8.name());
 
         try {
             // 1. Parse Request Payload
-            JsonNode rootNode = mapper.readTree(req.getReader());
+            JsonNode rootNode = mapper.readTree(ctx.getRequest().getReader());
             JsonNode snapshotNode = rootNode.get("snapshot");
 
             if (snapshotNode == null) {
@@ -69,6 +72,8 @@ public class JawireServlet extends HttpServlet {
             if (rootNode.hasNonNull("componentId")) {
                 component.setId(rootNode.get("componentId").asText());
             }
+
+            component.setHttpContext(ctx);
 
             // Lifecycle: Boot
             component.boot();
@@ -85,17 +90,43 @@ public class JawireServlet extends HttpServlet {
             processAction(component, rootNode.get("action"));
 
             // 5. Render View & Send Response
-            sendResponse(req, resp, component);
+            sendResponse(ctx.getRequest(), ctx.getResponse(), component);
 
         } catch (SecurityException e) {
             logger.warn("Security Alert: {}", e.getMessage());
-            resp.sendError(HttpServletResponse.SC_FORBIDDEN, "Security Violation");
+            e.printStackTrace();
+            ctx.sendError(HttpServletResponse.SC_FORBIDDEN, "Security Violation");
         } catch (ClassNotFoundException | IllegalArgumentException e) {
             logger.error("Bad Request: {}", e.getMessage());
-            resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid Request");
+            e.printStackTrace();
+            ctx.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid Request");
+        } catch (JawireUpdateException e) {
+            ctx.sendRestResponse(new ExceptionResponse(
+                    e.getError(),
+                    e.getMessage(),
+                    e.getStatus()
+            ));
         } catch (Exception e) {
             logger.error("Internal Server Error processing Jawire request", e);
-            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal Server Error");
+            System.out.println(e.getClass().getName());
+            if (e.getCause() instanceof JawireUpdateException je){
+                ctx.setStatus(je.getStatus());
+                ctx.sendRestResponse(new ExceptionResponse(
+                        je.getError(),
+                        ctx.getMessage(je.getLocalizedMessage()),
+                        je.getStatus()
+                ));
+            } else {
+                ctx.setStatus(500);
+                ctx.sendRestResponse(new ExceptionResponse(
+                        "Unknown",
+                        e.getMessage(),
+                        500
+                ));
+            }
+
+
+
         }
     }
 
@@ -117,29 +148,47 @@ public class JawireServlet extends HttpServlet {
     private void processUpdates(Component component, JsonNode updatesNode) throws Exception {
         if (updatesNode == null || !updatesNode.isObject()) return;
 
+
+        ObjectMapper updateMapper = mapper.copy();
+        updateMapper.setAnnotationIntrospector(new ModelOnlyIntrospector());
+
+        updateMapper.disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
         Iterator<Map.Entry<String, JsonNode>> fields = updatesNode.fields();
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> entry = fields.next();
             String propertyName = entry.getKey();
             JsonNode valueNode = entry.getValue();
 
-            // Find Setter using Java Beans Introspector (More robust than string concatenation)
-            Method setter = findSetter(component.getClass(), propertyName);
+            // 2. SECURITY CHECK: Chỉ cho phép update field có @Model
+            if (!JawireUtils.isModelField(component.getClass(), propertyName)) {
+                logger.warn("Security: Blocked update on non-model field '{}'", propertyName);
+                continue;
+            }
 
-            if (setter != null) {
-                // Convert value to the correct type expected by the setter
-                Object newValue = mapper.convertValue(valueNode, setter.getParameterTypes()[0]);
+            try {
+                // 3. Lifecycle: Updating
+                // Lưu ý: Lúc này chưa có giá trị mới dạng Object, chỉ có JsonNode
+                // Nếu muốn lấy giá trị cũ để so sánh, có thể dùng ReflectionUtils.get(component, propertyName)
+                component.updating(propertyName, valueNode);
 
-                // Lifecycle: Updating
-                component.updating(propertyName, newValue);
+                // 4. CORE: Dùng Jackson để update trường này vào Component
+                // Tạo một ObjectNode nhỏ chứa đúng 1 field đang xét để đưa cho Jackson
+                ObjectNode singleFieldUpdate = mapper.createObjectNode();
+                singleFieldUpdate.set(propertyName, valueNode);
 
-                // Invoke Setter
-                setter.invoke(component, newValue);
+                // Jackson sẽ tự tìm setter hoặc field tương ứng để điền dữ liệu
+                // Nó tự động convert String -> ULID, String -> LocalDateTime...
+                updateMapper.readerForUpdating(component).readValue(singleFieldUpdate);
 
-                // Lifecycle: Updated
+                // 5. Lifecycle: Updated
+                // Lấy giá trị thực tế đã được set vào component để pass vào hook
+                Object newValue = ReflectionUtils.get(component, propertyName);
                 component.updated(propertyName, newValue);
-            } else {
-                logger.debug("No public setter found for property '{}' in {}", propertyName, component.getClass().getName());
+
+            } catch (Exception e) {
+                logger.error("JWire: Error updating property '{}'", propertyName, e);
+                e.printStackTrace();
             }
         }
     }
@@ -178,7 +227,7 @@ public class JawireServlet extends HttpServlet {
 
         String finalHtml = new StringBuilder()
                 .append("<div id=\"").append(component.getId()).append("\"")
-                .append(" jw-snapshot=\"").append(jsonResponse).append("\">")
+                .append(" jw-snapshot='").append(jsonResponse).append("'>")
                 .append(htmlContent)
                 .append("</div>")
                 .toString();
@@ -267,9 +316,19 @@ public class JawireServlet extends HttpServlet {
         @Override
         public ServletOutputStream getOutputStream() {
             return new ServletOutputStream() {
-                @Override public boolean isReady() { return true; }
-                @Override public void setWriteListener(WriteListener w) {}
-                @Override public void write(int b) { writer.write(b); }
+                @Override
+                public boolean isReady() {
+                    return true;
+                }
+
+                @Override
+                public void setWriteListener(WriteListener w) {
+                }
+
+                @Override
+                public void write(int b) {
+                    writer.write(b);
+                }
             };
         }
     }

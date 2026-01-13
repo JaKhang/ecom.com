@@ -13,13 +13,13 @@
 </head>
 <body>
 <jsp:include page="/WEB-INF/common/client/header.jsp"/>
-
 <main class="main">
     <jsp:doBody/>
 </main>
 
 <jsp:include page="/WEB-INF/common/client/footer.jsp"/>
 <jsp:include page="/WEB-INF/common/client/scripts.jsp"/>
+<jsp:include page="/WEB-INF/common/client/alert.jsp"/>
 <jsp:invoke fragment="js"/>
 </body>
 </html>

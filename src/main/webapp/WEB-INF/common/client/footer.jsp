@@ -1,3 +1,4 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <footer class="footer">
     <div class="footer-1">
@@ -48,8 +49,8 @@
                     <h4 class="mb-30 color-gray-1000">App &amp; Payment</h4>
                     <div>
                         <p class="font-md color-gray-900">Download our Apps and get extra 15% Discount on your first Order&mldr;!</p>
-                        <div class="mt-20"><a class="mr-10" href="#"><img src="assets/imgs/template/appstore.png" alt="Ecom"></a><a href="#"><img src="assets/imgs/template/google-play.png" alt="Ecom"></a></div>
-                        <p class="font-md color-gray-900 mt-20 mb-10">Secured Payment Gateways</p><img src="assets/imgs/template/payment-method.png" alt="Ecom">
+                        <div class="mt-20"><a class="mr-10" href="#"><img src="<c:url value="/static/client/imgs/template/appstore.png"/>" alt="Ecom"></a><a href="#"><img src="<c:url value="/static/client/imgs/template/google-play.png"/>" alt="Ecom"></a></div>
+                        <p class="font-md color-gray-900 mt-20 mb-10">Secured Payment Gateways</p><img src="<c:url value="/static/client/imgs/template/payment-method.png"/>" alt="Ecom">
                     </div>
                 </div>
             </div>
@@ -58,7 +59,7 @@
     <div class="footer-2">
         <div class="footer-bottom-1">
             <div class="container">
-                <div class="footer-2-top mb-20"><a href="index.html"><img alt="Ecom" src="assets/imgs/template/logo-2.svg"></a><a class="font-xs color-gray-1000" href="#">EcomMarket.com</a><a class="font-xs color-gray-1000" href="#">Ecom Partners</a><a class="font-xs color-gray-1000" href="#">Ecom Bussiness</a><a class="font-xs color-gray-1000" href="#">Ecom Factory</a></div>
+                <div class="footer-2-top mb-20"><a href="index.html"><img alt="Ecom" src="<c:url value="/static/client/imgs/template/logo-2.svg"/>"></a><a class="font-xs color-gray-1000" href="#">EcomMarket.com</a><a class="font-xs color-gray-1000" href="#">Ecom Partners</a><a class="font-xs color-gray-1000" href="#">Ecom Bussiness</a><a class="font-xs color-gray-1000" href="#">Ecom Factory</a></div>
                 <div class="footer-2-bottom">
                     <div class="head-left-footer">
                         <h6 class="color-gray-1000">Electronic:</h6>

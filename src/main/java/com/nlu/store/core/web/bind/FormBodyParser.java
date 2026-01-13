@@ -26,7 +26,7 @@ public class FormBodyParser implements BodyParser {
             T instance = targetType.getDeclaredConstructor().newInstance();
 
             // 2. Duyệt qua các field để map dữ liệu
-            for (Field field : targetType.getDeclaredFields()) {
+            for (Field field : getAllFields(targetType)) {
                 if (Modifier.isStatic(field.getModifiers()) || Modifier.isFinal(field.getModifiers())) {
                     continue;
                 }
@@ -51,6 +51,16 @@ public class FormBodyParser implements BodyParser {
     }
 
     // --- Helper Methods using ReflectionUtils ---
+
+    private List<Field> getAllFields(Class<?> type) {
+        List<Field> fields = new ArrayList<>();
+        Class<?> current = type;
+        while (current != null && current != Object.class) {
+            Collections.addAll(fields, current.getDeclaredFields());
+            current = current.getSuperclass();
+        }
+        return fields;
+    }
 
     private void bindSingleValue(HttpServletRequest request, Object instance, Field field, String paramName) {
         String value = request.getParameter(paramName);

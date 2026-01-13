@@ -12,6 +12,7 @@ public abstract class AbstractController extends HttpServlet {
     @Inject
    private WebInfrastructure webInfrastructure;
 
+
     ;
 
     private enum HttpMethod { GET, POST, PUT, DELETE }

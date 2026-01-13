@@ -1,8 +1,10 @@
+<%@ tag import="com.nlu.store.core.web.HttpContext" %>
 <%@ tag description="Show body if user is logged in" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<c:set var="authKey" value="<%= HttpContext.AUTHENTICATION_KEY %>" />
 
 <%-- Lấy object từ session dựa trên key "USER_PRINCIPAL" --%>
-<c:set var="auth" value="${sessionScope['USER_PRINCIPAL']}"/>
+<c:set var="auth" value="${sessionScope[authKey]}"/>
 
 <%-- Kiểm tra tồn tại và active --%>
 <c:if test="${not empty auth and auth.isActive()}">

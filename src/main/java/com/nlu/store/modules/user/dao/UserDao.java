@@ -6,7 +6,7 @@ import java.util.Optional;
 
 public interface UserDao {
     Optional<User> findByEmail(String email);
-    Optional<User> findByResetToken(String token); // Cần thêm hàm này
+    Optional<User> findByResetToken(String token);
     boolean existsByEmail(String email);
     void create(User user);
     void update(User user);

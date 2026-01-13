@@ -23,18 +23,21 @@ public class WebInfrastructure {
     @Inject
     private BodyParser bodyParser;
 
+    @Inject
+    private PathExtractor pathExtractor;
+
 
     public WebInfrastructure() {
     }
 
-    public WebInfrastructure(ViewResolver viewResolver, ObjectMapper objectMapper, DataBinder dataBinder, ConversionService conversionService, BodyParser bodyParser) {
+    public WebInfrastructure(ViewResolver viewResolver, ObjectMapper objectMapper, DataBinder dataBinder, ConversionService conversionService, BodyParser bodyParser, PathExtractor pathExtractor) {
         this.viewResolver = viewResolver;
         this.objectMapper = objectMapper;
         this.dataBinder = dataBinder;
         this.conversionService = conversionService;
         this.bodyParser = bodyParser;
+        this.pathExtractor = pathExtractor;
     }
-
 
     // --- Fluent Accessors (No 'get' prefix) ---
 
@@ -57,5 +60,9 @@ public class WebInfrastructure {
 
     public BodyParser bodyParser() {
         return bodyParser;
+    }
+
+    public PathExtractor pathExtractor() {
+        return pathExtractor;
     }
 }

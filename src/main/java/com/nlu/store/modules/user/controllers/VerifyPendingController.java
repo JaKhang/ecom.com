@@ -14,12 +14,14 @@ public class VerifyPendingController extends AbstractController {
 
     @Override
     protected void doGet(HttpContext ctx) {
-
-        Authentication authentication = ctx.authentication();
-
-        if (!authentication.isVerified()) {
-            ctx.view("client/verify-pending");
+        if (ctx.isAuthenticated()){
+            if (!ctx.authentication().isVerified()){
+                ctx.view("client/verify-pending");
+            } else {
+                ctx.redirect("/");
+            }
         }
+
     }
 
 

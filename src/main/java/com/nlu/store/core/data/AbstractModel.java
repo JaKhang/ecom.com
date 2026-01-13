@@ -30,4 +30,7 @@ public abstract class AbstractModel {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
+
+    public AbstractModel() {
+    }
 }

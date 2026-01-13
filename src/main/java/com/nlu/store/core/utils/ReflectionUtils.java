@@ -1,5 +1,8 @@
 package com.nlu.store.core.utils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -8,152 +11,132 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
- * Utility class hỗ trợ Reflection với hiệu năng cao nhờ Caching.
- * Hỗ trợ:
- * 1. Getter: getField(), isField(), field() (Record), direct field access.
- * 2. Setter: setField(), direct field access.
+ * High-Performance Reflection Wrapper.
+ * <p>
+ * Purpose: Read/Write object properties efficiently using Caching and Functional Interfaces.
+ * This utility is framework-agnostic.
+ * </p>
  */
 public class ReflectionUtils {
 
-    // Cache cho Getter: Key = "ClassName.fieldName", Value = Function để lấy giá trị
+    private static final Logger logger = LoggerFactory.getLogger(ReflectionUtils.class);
+
+    // --- CACHES ---
+    // Cache for Getters: Key = "ClassName.fieldName", Value = Function to retrieve value
     private static final Map<String, Function<Object, Object>> GETTER_CACHE = new ConcurrentHashMap<>();
 
-    // Cache cho Setter: Key = "ClassName.fieldName", Value = BiConsumer để set giá trị
+    // Cache for Setters: Key = "ClassName.fieldName", Value = BiConsumer to set value
     private static final Map<String, BiConsumer<Object, Object>> SETTER_CACHE = new ConcurrentHashMap<>();
+
+    // Cache for Setter Methods: Used to determine parameter types for JSON conversion
+    private static final Map<String, Method> SETTER_METHOD_CACHE = new ConcurrentHashMap<>();
 
     private ReflectionUtils() {
         // Prevent instantiation
     }
 
     /**
-     * Lấy giá trị của một field từ object (High Performance).
+     * Retrieve a field value from an object (High Performance).
      *
-     * @param target    Object chứa dữ liệu
-     * @param fieldName Tên field (ví dụ: "username", "email")
-     * @return Giá trị của field
+     * @param target    The object instance.
+     * @param fieldName The name of the field.
+     * @return The value of the field.
      */
     public static Object get(Object target, String fieldName) {
         if (target == null) return null;
         String key = target.getClass().getName() + "." + fieldName;
-
-        // Lấy từ cache hoặc tạo mới nếu chưa có (computeIfAbsent đảm bảo thread-safe)
-        Function<Object, Object> getter = GETTER_CACHE.computeIfAbsent(key, k -> createGetter(target.getClass(), fieldName));
-
-        return getter.apply(target);
+        return GETTER_CACHE.computeIfAbsent(key, k -> createGetter(target.getClass(), fieldName))
+                .apply(target);
     }
 
     /**
-     * Gán giá trị cho một field của object (High Performance).
+     * Set a field value on an object (High Performance).
      *
-     * @param target    Object cần gán
-     * @param fieldName Tên field
-     * @param value     Giá trị cần gán
+     * @param target    The object instance.
+     * @param fieldName The name of the field.
+     * @param value     The value to set.
      */
     public static void set(Object target, String fieldName, Object value) {
         if (target == null) return;
         String key = target.getClass().getName() + "." + fieldName;
-
-        BiConsumer<Object, Object> setter = SETTER_CACHE.computeIfAbsent(key, k -> createSetter(target.getClass(), fieldName));
-
-        setter.accept(target, value);
+        SETTER_CACHE.computeIfAbsent(key, k -> createSetter(target.getClass(), fieldName))
+                .accept(target, value);
     }
 
-    // --- Internal Logic tạo Getter ---
+    /**
+     * Find the Setter Method for a given property.
+     * Useful for determining the parameter type (e.g., for Jackson ObjectMapper).
+     *
+     * @param clazz        The class to search.
+     * @param propertyName The property name.
+     * @return The Method object, or null if not found.
+     */
+    public static Method findSetterMethod(Class<?> clazz, String propertyName) {
+        String cacheKey = clazz.getName() + "." + propertyName;
+        return SETTER_METHOD_CACHE.computeIfAbsent(cacheKey, k -> {
+            String setterName = "set" + Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
+            for (Method method : clazz.getMethods()) {
+                // We look for a public method named setXxx with exactly 1 parameter
+                if (method.getName().equals(setterName) && method.getParameterCount() == 1) {
+                    return method;
+                }
+            }
+            return null;
+        });
+    }
+
+    // ==================================================================================
+    // INTERNAL FACTORIES (Getter/Setter Creation Logic)
+    // ==================================================================================
 
     private static Function<Object, Object> createGetter(Class<?> clazz, String fieldName) {
-        String capitalized = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
+        String cap = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
 
-        // 1. Thử tìm method getXxx() (Java Bean chuẩn)
-        try {
-            Method method = clazz.getMethod("get" + capitalized);
-            return obj -> invokeMethod(method, obj);
-        } catch (NoSuchMethodException e) { /* ignore */ }
+        // 1. Try standard Getter: getXxx()
+        try { Method m = clazz.getMethod("get" + cap); return o -> invoke(m, o); } catch (Exception e) {}
 
-        // 2. Thử tìm method isXxx() (Boolean)
-        try {
-            Method method = clazz.getMethod("is" + capitalized);
-            return obj -> invokeMethod(method, obj);
-        } catch (NoSuchMethodException e) { /* ignore */ }
+        // 2. Try boolean Getter: isXxx()
+        try { Method m = clazz.getMethod("is" + cap); return o -> invoke(m, o); } catch (Exception e) {}
 
-        // 3. Thử tìm method xxx() (Java Record / Fluent)
-        try {
-            Method method = clazz.getMethod(fieldName);
-            return obj -> invokeMethod(method, obj);
-        } catch (NoSuchMethodException e) { /* ignore */ }
+        // 3. Try fluent/record style: xxx()
+        try { Method m = clazz.getMethod(fieldName); return o -> invoke(m, o); } catch (Exception e) {}
 
-        // 4. Fallback: Truy cập trực tiếp Field
+        // 4. Fallback: Direct Field Access
         try {
-            Field field = getFieldRecursively(clazz, fieldName);
-            field.setAccessible(true);
-            return obj -> getFieldValue(field, obj);
-        } catch (NoSuchFieldException e) {
-            // Nếu không tìm thấy gì cả, trả về null thay vì throw lỗi để tránh crash flow validate
-            System.err.println("[ReflectionUtils] Getter not found for: " + clazz.getName() + "." + fieldName);
-            return obj -> null;
+            Field f = getFieldRecursively(clazz, fieldName);
+            f.setAccessible(true);
+            return o -> getField(f, o);
+        } catch (Exception e) {
+            // Return null if not found to prevent crashes during validation flows
+            return o -> null;
         }
     }
-
-    // --- Internal Logic tạo Setter ---
 
     private static BiConsumer<Object, Object> createSetter(Class<?> clazz, String fieldName) {
-        String capitalized = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-        String setterName = "set" + capitalized;
+        // 1. Try finding a Setter Method first
+        Method m = findSetterMethod(clazz, fieldName);
+        if (m != null) return (o, v) -> invoke(m, o, v);
 
-        // 1. Thử tìm method setXxx(Arg)
-        // Lưu ý: Setter khó hơn vì cần biết kiểu tham số.
-        // Ở đây ta quét tất cả method, tìm method có tên setXxx và 1 tham số.
-        for (Method method : clazz.getMethods()) {
-            if (method.getName().equals(setterName) && method.getParameterCount() == 1) {
-                return (obj, val) -> invokeMethod(method, obj, val);
-            }
-        }
-
-        // 2. Fallback: Truy cập trực tiếp Field
+        // 2. Fallback: Direct Field Access
         try {
-            Field field = getFieldRecursively(clazz, fieldName);
-            field.setAccessible(true);
-            return (obj, val) -> setFieldValue(field, obj, val);
-        } catch (NoSuchFieldException e) {
-            System.err.println("[ReflectionUtils] Setter not found for: " + clazz.getName() + "." + fieldName);
-            return (obj, val) -> {}; // No-op consumer
-        }
-    }
-
-    // --- Helper Methods ---
-
-    private static Field getFieldRecursively(Class<?> clazz, String fieldName) throws NoSuchFieldException {
-        Class<?> current = clazz;
-        while (current != null) {
-            try {
-                return current.getDeclaredField(fieldName);
-            } catch (NoSuchFieldException e) {
-                current = current.getSuperclass();
-            }
-        }
-        throw new NoSuchFieldException(fieldName);
-    }
-
-    private static Object invokeMethod(Method method, Object target, Object... args) {
-        try {
-            return method.invoke(target, args);
+            Field f = getFieldRecursively(clazz, fieldName);
+            f.setAccessible(true);
+            return (o, v) -> setField(f, o, v);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to invoke method " + method.getName(), e);
+            return (o, v) -> {}; // No-op consumer
         }
     }
 
-    private static Object getFieldValue(Field field, Object target) {
-        try {
-            return field.get(target);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Failed to get field " + field.getName(), e);
+    private static Field getFieldRecursively(Class<?> clazz, String name) throws NoSuchFieldException {
+        Class<?> curr = clazz;
+        while (curr != null) {
+            try { return curr.getDeclaredField(name); } catch (Exception e) { curr = curr.getSuperclass(); }
         }
+        throw new NoSuchFieldException(name);
     }
 
-    private static void setFieldValue(Field field, Object target, Object value) {
-        try {
-            field.set(target, value);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Failed to set field " + field.getName(), e);
-        }
-    }
+    // Wrappers to handle checked exceptions inside lambdas
+    private static Object invoke(Method m, Object t, Object... args) { try { return m.invoke(t, args); } catch (Exception e) { throw new RuntimeException(e); } }
+    private static Object getField(Field f, Object t) { try { return f.get(t); } catch (Exception e) { throw new RuntimeException(e); } }
+    private static void setField(Field f, Object t, Object v) { try { f.set(t, v); } catch (Exception e) { throw new RuntimeException(e); } }
 }

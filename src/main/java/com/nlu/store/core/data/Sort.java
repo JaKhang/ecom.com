@@ -47,6 +47,10 @@ public class Sort implements Iterable<Sort.Order> {
         return orders.isEmpty();
     }
 
+    public List<Order> getOrders() {
+        return Collections.unmodifiableList(orders);
+    }
+
     @Override
     public Iterator<Order> iterator() {
         return orders.iterator();
@@ -196,5 +200,45 @@ public class Sort implements Iterable<Sort.Order> {
     @Override
     public int hashCode() {
         return Objects.hashCode(orders);
+    }
+
+    public static Sort parse(String sortString) {
+        if (StringUtils.isBlank(sortString)) {
+            return UNSORTED;
+        }
+
+        String[] parts = sortString.split(",");
+        List<Order> orders = new ArrayList<>();
+
+        for (String part : parts) {
+            part = part.trim();
+            if (part.isEmpty()) {
+                continue;
+            }
+
+            String[] propertyAndDirection = part.split(":");
+            String property = propertyAndDirection[0].trim();
+            Direction direction = DEFAULT_DIRECTION; // Default direction
+
+            // Check if a direction is specified
+            if (propertyAndDirection.length > 1) {
+                direction = Direction.fromString(propertyAndDirection[1].trim());
+            }
+
+            orders.add(new Order(property, direction));
+        }
+
+        return orders.isEmpty() ? UNSORTED : new Sort(orders);
+    }
+
+    @Override
+    public String toString() {
+        if (isUnsorted()) {
+            return "";
+        }
+
+        return orders.stream()
+                .map(order -> String.format("%s:%s", order.getProperty(), order.getDirection().name().toLowerCase()))
+                .collect(Collectors.joining(","));
     }
 }

@@ -4,11 +4,27 @@
     <inspection_tool class="HtmlUnknownAttribute" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="myValues">
         <value>
-          <list size="4">
+          <list size="20">
             <item index="0" class="java.lang.String" itemvalue="jw-model" />
             <item index="1" class="java.lang.String" itemvalue="jw-click" />
             <item index="2" class="java.lang.String" itemvalue="x-data" />
             <item index="3" class="java.lang.String" itemvalue="x-init" />
+            <item index="4" class="java.lang.String" itemvalue=":class" />
+            <item index="5" class="java.lang.String" itemvalue=":style" />
+            <item index="6" class="java.lang.String" itemvalue="@click" />
+            <item index="7" class="java.lang.String" itemvalue="x-show" />
+            <item index="8" class="java.lang.String" itemvalue="x-text" />
+            <item index="9" class="java.lang.String" itemvalue="jw-update" />
+            <item index="10" class="java.lang.String" itemvalue=":disabled" />
+            <item index="11" class="java.lang.String" itemvalue="jw-replace" />
+            <item index="12" class="java.lang.String" itemvalue="jw-ignore" />
+            <item index="13" class="java.lang.String" itemvalue="jw-debounce" />
+            <item index="14" class="java.lang.String" itemvalue="jw-change" />
+            <item index="15" class="java.lang.String" itemvalue="jw-childOnly" />
+            <item index="16" class="java.lang.String" itemvalue="@mouseleave" />
+            <item index="17" class="java.lang.String" itemvalue="@mouseover" />
+            <item index="18" class="java.lang.String" itemvalue=":src" />
+            <item index="19" class="java.lang.String" itemvalue="x-for" />
           </list>
         </value>
       </option>

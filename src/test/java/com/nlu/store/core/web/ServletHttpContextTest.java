@@ -23,7 +23,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -59,7 +58,7 @@ class ServletHttpContextTest {
         // Ta cần mock hành vi đó:
 
 
-        WebInfrastructure infrastructure = new WebInfrastructure(viewResolver, objectMapper, dataBinder, conversionService, bodyParser);
+        WebInfrastructure infrastructure = new WebInfrastructure(viewResolver, objectMapper, dataBinder, conversionService, bodyParser, null);
 
         // 2. Init Context
         context = new ServletHttpContext(req, resp, infrastructure);

@@ -2,19 +2,38 @@ package com.nlu.store.core.validation;
 
 import java.util.Objects;
 
+/**
+ * Functional interface for validating objects of type T.
+ * <p>
+ * Implements the <strong>Combinator Pattern</strong>, allowing multiple validation rules
+ * to be chained together using {@link #and(Validator)}.
+ * </p>
+ *
+ * @param <T> the type of the object to validate.
+ * @author Ja Khang
+ */
 @FunctionalInterface
 public interface Validator<T> {
 
     /**
-     * Phương thức trừu tượng duy nhất.
-     * Thực hiện validate logic.
+     * Validates the given input.
+     *
+     * @param t the object to validate.
+     * @return a {@link ValidateResult} containing success status and potential error messages.
      */
     ValidateResult validate(T t);
 
     /**
-     * Kết hợp validator hiện tại với một validator khác.
-     * Short-circuit: Cả 2 phải đúng. Nếu cái đầu sai, vẫn chạy cái sau để gom lỗi (hoặc tùy logic).
-     * Ở đây tôi chọn phương án: Gom tất cả lỗi của cả 2.
+     * Combines this validator with another validator.
+     * <p>
+     * <strong>Strategy: Error Accumulation</strong><br>
+     * Unlike short-circuiting logic (&&), this method executes <strong>both</strong> validators
+     * and merges their results. This is ideal for form validation where users need to see
+     * all errors at once.
+     * </p>
+     *
+     * @param other the other validator to chain.
+     * @return a new Validator that performs both checks.
      */
     default Validator<T> and(Validator<? super T> other) {
         Objects.requireNonNull(other);
@@ -22,10 +41,8 @@ public interface Validator<T> {
             ValidateResult result1 = this.validate(t);
             ValidateResult result2 = other.validate(t);
 
-            // Gộp kết quả của cả 2
+            // Merge results to accumulate all errors
             return result1.merge(result2);
         };
     }
-
-
 }

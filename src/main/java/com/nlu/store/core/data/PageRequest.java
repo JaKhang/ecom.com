@@ -49,7 +49,7 @@ public class PageRequest implements Pageable {
 
     @Override
     public int getOffset() {
-        return page * limit;
+        return (page - 1) * limit;
     }
 
     @Override

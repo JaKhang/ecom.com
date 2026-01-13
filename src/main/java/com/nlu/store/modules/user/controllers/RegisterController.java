@@ -34,14 +34,12 @@ public class RegisterController extends AbstractController {
     protected void doPost(HttpContext ctx) {
         BindingResult<RegisterRequest> result = ctx.getBody(RegisterRequest.class, new RegisterRequestValidator());
         if (result.hasError()) {
-            System.out.println(result.data());
-            ctx.setAttribute("errors", result.details());
-            ctx.setAttribute("form", result.data());
             ctx.view("client/register");
             return;
         }
 
         try {
+            RegisterRequest request = result.data();
             authService.register(result.data());
             ctx.setFlashAttribute("alertMessage", "auth.register.success");
             ctx.redirect("/login");

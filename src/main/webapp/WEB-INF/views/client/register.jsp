@@ -116,13 +116,13 @@
                         <h5 class="text-center"><fmt:message key="register.social.title"/></h5>
                         <div class="box-button-login mt-25">
                             <a class="btn btn-login font-md-bold color-brand-3 mb-15">
-                                Sign up with <img src="<c:url value='/static/imgs/page/account/google.svg'/>" alt="Google">
+                                Sign up with <img src="<c:url value='/static/client/imgs/page/account/google.svg'/>" alt="Google">
                             </a>
                             <a class="btn btn-login font-md-bold color-brand-3 mb-15">
                                 Sign up with <span class="color-blue font-md-bold">Facebook</span>
                             </a>
                             <a class="btn btn-login font-md-bold color-brand-3 mb-15">
-                                Sign up with <img src="<c:url value='/static/imgs/page/account/amazon.svg'/>" alt="Amazon">
+                                Sign up with <img src="<c:url value='/static/client/imgs/page/account/amazon.svg'/>" alt="Amazon">
                             </a>
                         </div>
                     </div>

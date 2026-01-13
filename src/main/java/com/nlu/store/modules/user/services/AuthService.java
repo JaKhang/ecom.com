@@ -11,9 +11,11 @@ public interface AuthService {
 
     void verify(String email, String token);
 
-    void requestVerify(String email);
+    long requestVerify(String email);
 
     void resetPassword(String token, String newPassword);
 
     void requestResetPassword(String email);
+
+    long getRequestVerifyCountDown(String username);
 }

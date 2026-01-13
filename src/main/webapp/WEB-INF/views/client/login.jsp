@@ -22,7 +22,14 @@
                                 <fmt:message key="${errors['global']}"/>
                             </div>
                         </c:if>
-                        <form action="<c:url value='/login'/>" method="post">
+                        <form action="<%--@elvariable id="redirectUrl" type="java.lang.String"--%>
+                        <c:url value="/login" var="loginAction">
+    <c:if test="${not empty redirectUrl}">
+        <c:param name="redirectUrl" value="${redirectUrl}"/>
+    </c:if>
+</c:url>
+                        <c:url value='${loginAction}'/>"
+                              method="post">
 
                             <!-- === EMAIL / USERNAME FIELD === -->
                             <div class="form-group">

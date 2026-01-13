@@ -1,7 +1,7 @@
 package com.nlu.store.modules.user.dao;
 
-import com.nlu.store.core.dao.ResultSetReader;
-import com.nlu.store.core.dao.RowMapper;
+import com.nlu.store.core.jdbc.ResultSetReader;
+import com.nlu.store.core.jdbc.RowMapper;
 import com.nlu.store.modules.user.models.Role;
 
 import java.sql.SQLException;
@@ -21,7 +21,7 @@ public class RoleMapper implements RowMapper<Role> {
     }
 
     @Override
-    public String getPrefix() {
+    public String prefix() {
         return prefix;
     }
 

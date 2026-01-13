@@ -6,10 +6,8 @@ import com.nlu.store.core.validation.Validator;
 import com.nlu.store.core.web.bind.BindingResult;
 import com.nlu.store.core.web.flash.Flash;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.Part;
+import jakarta.servlet.http.*;
+import jakarta.servlet.jsp.jstl.core.Config;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -150,12 +148,12 @@ public class ServletHttpContext implements HttpContext {
 
     @Override
     public Pageable getPageable() {
-        // 1. Parse Page (URL thường là 1-based, PageRequest là 0-based)
+        // 1. Parse Page
         int page = getParam("page", Integer.class, 1, false);
-        int pageIndex = (page > 0) ? page - 1 : 0;
+        int pageIndex = (page > 0) ? page : 1;
 
         // 2. Parse Limit
-        int limit = getParam("limit", Integer.class, 10, false);
+        int limit = getParam("limit", Integer.class, 12, false);
 
         // 3. Parse Sort (Format: ?sort=name,asc&sort=price,desc)
         List<String> sortParams = getParams("sort");
@@ -190,7 +188,7 @@ public class ServletHttpContext implements HttpContext {
 
     @Override
     public String getPathVariable(String template, String name) {
-        return getPathVariable(template, name, String.class);
+        return infrastructure.pathExtractor().extractPathValue(template, name, getRequestPath());
     }
 
     @Override
@@ -200,10 +198,9 @@ public class ServletHttpContext implements HttpContext {
 
     @Override
     public <T> T getPathVariable(String template, String name, Class<T> type) {
-        @SuppressWarnings("unchecked")
-        Map<String, String> vars = (Map<String, String>) req.getAttribute("URI_TEMPLATE_VARIABLES");
-        if (vars == null || !vars.containsKey(name)) return null;
-        return infrastructure.conversionService().convert(vars.get(name), type);
+        String value = getPathVariable(template, name);
+        if (value == null) return null;
+        return infrastructure.conversionService().convert(value, type);
     }
 
     // ==================================================================
@@ -217,7 +214,10 @@ public class ServletHttpContext implements HttpContext {
 
     @Override
     public <T> BindingResult<T> getBody(Class<T> tClass, Validator<T> validator) {
-       return infrastructure.dataBinder().bind(req, tClass, validator);
+        BindingResult<T> result = infrastructure.dataBinder().bind(req, tClass, validator);
+        req.setAttribute(ATTR_ERRORS, result.details());
+        req.setAttribute(ATTR_FORM, result.data());
+        return result;
     }
 
 
@@ -340,16 +340,73 @@ public class ServletHttpContext implements HttpContext {
 
     @Override
     public Authentication authentication() {
-        if (this.authentication != null) return this.authentication;
-        this.authentication = (Authentication) req.getSession().getAttribute(AUTHENTICATION_KEY);
-        return this.authentication;
+        // 1. Level 1: Local Cache (Nhanh nhất)
+        if (this.authentication != null) {
+            return this.authentication;
+        }
+
+        // 2. Level 2: Request Attribute (Được set bởi SecurityFilter)
+        Object reqAuth = req.getAttribute(AUTHENTICATION_KEY);
+        if (reqAuth instanceof Authentication) {
+            this.authentication = (Authentication) reqAuth;
+            return this.authentication;
+        }
+
+        // 3. Level 3: Session (Fallback cho Legacy hoặc Stateful App)
+        // Lưu ý: getSession(false) để không tạo session rác nếu client là bot/api
+        var session = req.getSession(false);
+        if (session != null) {
+            Object sessionAuth = session.getAttribute(AUTHENTICATION_KEY);
+            if (sessionAuth instanceof Authentication) {
+                this.authentication = (Authentication) sessionAuth;
+                // Đồng bộ ngược lại vào Request để lần sau lấy nhanh hơn
+                req.setAttribute(AUTHENTICATION_KEY, this.authentication);
+                return this.authentication;
+            }
+        }
+
+        return null;
     }
 
     @Override
     public void setAuthentication(Authentication authentication) {
+        // 1. Cập nhật Cache cục bộ của instance này
         this.authentication = authentication;
-        req.getSession().setAttribute(AUTHENTICATION_KEY, authentication);
+
+        if (authentication != null) {
+            // --- TRƯỜNG HỢP ĐĂNG NHẬP (LOGIN) ---
+
+            // a. Lưu vào Request Attribute
+            // Giúp các thành phần khác trong cùng Request (như View, Filter khác) truy cập được ngay
+            // mà không cần đọc lại từ Session.
+            req.setAttribute(AUTHENTICATION_KEY, authentication);
+
+            // b. Lưu vào Session (Persistence)
+            // Hành động gọi setAuthentication() từ Controller ngầm định là "Ghi nhớ đăng nhập".
+            // - Nếu là Stateful (MVC): Ta cần tạo Session mới (true) để lưu trạng thái.
+            // - Nếu là Stateless (JWT): Controller thường KHÔNG gọi hàm này (chỉ trả Token).
+            //   (Nếu lỡ gọi thì sẽ tạo ra 1 session thừa, nhưng không ảnh hưởng logic xác thực).
+            req.getSession(true).setAttribute(AUTHENTICATION_KEY, authentication);
+
+        } else {
+            // --- TRƯỜNG HỢP ĐĂNG XUẤT (LOGOUT) ---
+
+            // a. Xóa khỏi Request hiện tại
+            req.removeAttribute(AUTHENTICATION_KEY);
+
+            // b. Xóa khỏi Session & Hủy Session
+            // Chỉ lấy session nếu nó đang tồn tại (false), không tạo mới để logout.
+            var session = req.getSession(false);
+            if (session != null) {
+                session.removeAttribute(AUTHENTICATION_KEY);
+
+                // QUAN TRỌNG: Hủy toàn bộ Session để ngăn chặn Session Fixation Attack
+                // Mọi dữ liệu khác trong session cũng sẽ bị xóa.
+                session.invalidate();
+            }
+        }
     }
+
 
     // ==================================================================
     // RESPONSE & NAVIGATION
@@ -406,7 +463,7 @@ public class ServletHttpContext implements HttpContext {
     }
 
     @Override
-    public void includes(String path) {
+    public void include(String path) {
         try {
             req.getRequestDispatcher(path).include(req, resp);
         } catch (ServletException | IOException e) {
@@ -456,4 +513,64 @@ public class ServletHttpContext implements HttpContext {
         if (model != null) model.forEach(req::setAttribute);
         view(viewName);
     }
+
+    @Override
+    public void alert(AlertType type, String messageKey) {
+        this.setFlashAttribute(ALERT_KEY, new Alert(type, messageKey));
+    }
+
+    @Override
+    public String getRequestPath() {
+        String contextPath = req.getContextPath();
+        String requestURI = req.getRequestURI();
+        return requestURI.substring(contextPath.length());
+    }
+
+    // ==================================================================
+    // I18N / MESSAGES IMPLEMENTATION
+    // ==================================================================
+
+    @Override
+    public String getMessage(String key) {
+        return getMessage(key, key);
+    }
+
+    @Override
+    public String getMessage(String key, String defaultValue) {
+        try {
+            // 1. XÁC ĐỊNH LOCALE (Ưu tiên Session -> Browser)
+            Locale locale = null;
+
+            // Kiểm tra trong Session xem LocaleFilter đã set ngôn ngữ chưa
+            // Key chuẩn của JSTL là: "javax.servlet.jsp.jstl.fmt.locale"
+            HttpSession session = req.getSession(false);
+            if (session != null) {
+                Object sessionLocale = Config.get(session, Config.FMT_LOCALE);
+                if (sessionLocale instanceof Locale) {
+                    locale = (Locale) sessionLocale;
+                }
+            }
+
+            // Nếu không có trong Session, dùng mặc định của trình duyệt
+            if (locale == null) {
+                locale = req.getLocale();
+            }
+
+            // 2. Lấy tên file Resource từ web.xml
+            String baseName = req.getServletContext().getInitParameter("jakarta.servlet.jsp.jstl.fmt.localizationContext");
+            if (baseName == null || baseName.trim().isEmpty()) {
+                baseName = "messages"; // Tên file mặc định
+            }
+
+            // 3. Load ResourceBundle & Lấy text
+            ResourceBundle bundle = ResourceBundle.getBundle(baseName, locale);
+            return bundle.getString(key);
+
+        } catch (MissingResourceException e) {
+            return defaultValue;
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
 }

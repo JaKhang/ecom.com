@@ -1,8 +1,8 @@
 package com.nlu.store.config;
 
 import com.nlu.store.core.config.PropertySource;
-import com.nlu.store.core.dao.DefaultJdbcOperations;
-import com.nlu.store.core.dao.JdbcOperations;
+import com.nlu.store.core.jdbc.DefaultJdbcOperations;
+import com.nlu.store.core.jdbc.JdbcOperations;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,13 +28,22 @@ public class JdbcOperationsProducer {
         config.setUsername(propertySource.getString("datasource.username"));
         config.setPassword(propertySource.getString("datasource.password"));
         config.setDriverClassName(propertySource.getString("datasource.driverClassName"));
-        config.setMaximumPoolSize(propertySource.getInt("datasource.maximumPoolSize", 10));
+        config.setMaximumPoolSize(propertySource.getInt("datasource.maximumPoolSize", 4)); // Thay đổi giá trị mặc định thành 4
+
+        config.setMinimumIdle(propertySource.getInt("datasource.minimumIdle", 2)); // Số lượng kết nối nhàn rỗi tối thiểu
+        config.setIdleTimeout(propertySource.getInt("datasource.idleTimeout", 30000)); // Thời gian nhàn rỗi tối đa (ms)
+        config.setConnectionTimeout(propertySource.getInt("datasource.connectionTimeout", 30000)); // Thời gian chờ kết nối tối đa (ms)
+        config.setMaxLifetime(propertySource.getInt("datasource.maxLifetime", 1800000)); // Thời gian sống tối đa của kết nối (ms)
+
+        config.setConnectionTestQuery("SELECT 1"); // Câu lệnh kiểm tra kết nối
+        config.setAutoCommit(true); // Tự động commit các giao dịch
+
         return new HikariDataSource(config);
     }
 
     @Produces
     public JdbcOperations createDefaultJdbcOperations() {
-        return new DefaultJdbcOperations(createDataSource());
+        return new DefaultJdbcOperations(createDataSource(), propertySource);
     }
 
 

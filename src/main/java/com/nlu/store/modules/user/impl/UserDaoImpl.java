@@ -1,9 +1,9 @@
 package com.nlu.store.modules.user.impl;
 
-import com.nlu.store.core.dao.JdbcOperations;
+import com.nlu.store.core.jdbc.JdbcOperations;
 
 
-import com.nlu.store.core.dao.ResultSetExtractor;
+import com.nlu.store.core.jdbc.ResultSetExtractor;
 import com.nlu.store.modules.user.dao.RoleMapper;
 import com.nlu.store.modules.user.dao.UserDao;
 import com.nlu.store.modules.user.dao.UsersExtractor;
@@ -11,7 +11,6 @@ import com.nlu.store.modules.user.models.Role;
 import com.nlu.store.modules.user.models.User;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import lombok.RequiredArgsConstructor;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -26,7 +25,10 @@ import java.util.Optional;
 public class UserDaoImpl implements UserDao {
 
     private final JdbcOperations jdbc;
-
+    @Inject
+    public UserDaoImpl(JdbcOperations jdbc) {
+        this.jdbc = jdbc;
+    }
     // =================================================================================
     // SQL QUERIES (WITH PREFIX & JOIN)
     // =================================================================================
@@ -65,10 +67,7 @@ public class UserDaoImpl implements UserDao {
     
     private final ResultSetExtractor<List<User>> userWithRolesExtractor = new UsersExtractor(new RoleMapper("r_"), "u_");
 
-    @Inject
-    public UserDaoImpl(JdbcOperations jdbc) {
-        this.jdbc = jdbc;
-    }
+
 
     // =================================================================================
     // IMPLEMENTATION
@@ -159,14 +158,12 @@ public class UserDaoImpl implements UserDao {
             List<Object[]> batchArgs = new ArrayList<>();
 
             for (Role role : user.getRoles()) {
-                // Giả sử Role có ID là Long
                 batchArgs.add(new Object[]{
                         user.getId().toString(),
                         role.getId()
                 });
             }
 
-            // Dùng executeBatch để insert nhanh nhiều dòng
             jdbc.executeBatch(conn, SQL_INSERT_USER_ROLE, batchArgs);
         }
     }

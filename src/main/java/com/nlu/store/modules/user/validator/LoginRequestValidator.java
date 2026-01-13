@@ -6,6 +6,9 @@ import com.nlu.store.core.validation.ValidateResult;
 import com.nlu.store.core.validation.Validator;
 import com.nlu.store.modules.user.dto.LoginRequest;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class LoginRequestValidator implements Validator<LoginRequest> {
 
     @Override
@@ -13,19 +16,25 @@ public class LoginRequestValidator implements Validator<LoginRequest> {
         // 1. Fail-fast: Kiểm tra null object trước
         if (request == null) {
             SimpleValidateResult result = new SimpleValidateResult(LoginRequest.class);
-            result.addError("request", "validate.request.null");
+            result.addError("request", "validation.request.null");
             return result;
         }
+//        Map<String, String> errors = new HashMap<>();
+//        if (request.getEmail() == null)
+//                errors.put("email", "validation.auth.email.required");
+//        if (request.getPassword() == null)
+//            errors.put("password", "sjdkfasdkfsa");
+//        return new SimpleValidateResult(errors, LoginRequest.class);
 
-        // 2. Fluent Validation
+//        // 2. Fluent Validation
         return ValidateHelper.of(request)
                 // --- Email Validation ---
-                .notBlank("email", "validate.auth.email.required")
-                .isEmail("email", "validate.auth.email.invalid_format")
+                .notBlank("email", "validation.auth.email.required")
+                .isEmail("email", "validation.auth.email.invalid_format")
 
                 // --- Password Validation ---
-                .notBlank("password", "validate.auth.password.required")
-                 .minLength("password", 6, "validate.auth.password.min_length")
+                .notBlank("password", "validation.auth.password.required")
+                 .minLength("password", 6, "validation.auth.password.min_length")
 
                 .validate();
     }

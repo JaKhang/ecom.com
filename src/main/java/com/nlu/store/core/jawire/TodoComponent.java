@@ -84,7 +84,6 @@ public class TodoComponent extends Component {
 
     @Override
     public void updated(String field, Object value) {
-        System.out.println(field);
-        System.out.println(value);
+
     }
 }

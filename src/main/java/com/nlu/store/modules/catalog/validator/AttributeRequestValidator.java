@@ -36,10 +36,6 @@ public class AttributeRequestValidator implements Validator<AttributeRequest> {
             result.addError("code", "validate.attribute.code.invalid_format");
         }
 
-        // 3. Validate Type
-        if (request.type() == null) {
-            result.addError("type", "validate.attribute.type.required");
-        }
 
         // 4. Validate Unit (Optional nhưng check độ dài)
         if (request.unit() != null && request.unit().length() > 20) {

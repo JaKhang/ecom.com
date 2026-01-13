@@ -3,6 +3,7 @@ package com.nlu.store.modules.user.models;
 import com.nlu.store.core.data.ULID;
 import com.nlu.store.core.web.Authentication;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,14 +24,12 @@ public class AuthPrincipal implements Authentication {
     }
 
     @Override
-    public String username() {
-        // User entity không có field username, dùng email thay thế
+    public String identifier() {
         return user.getEmail();
     }
 
     @Override
     public boolean isVerified() {
-        // Kiểm tra logic: đã có thời gian verify chưa
         return user.getVerifiedAt() != null;
     }
 
@@ -40,12 +39,11 @@ public class AuthPrincipal implements Authentication {
     }
 
     @Override
-    public List<String> authorities() {
-        // Map từ List<Role> sang List<String> (dùng role code)
+    public Collection<String> authorities() {
         if (user.getRoles() == null) return List.of();
 
         return user.getRoles().stream()
-                .map(Role::getCode) // Giả sử Role có method getCode()
+                .map(Role::getCode)
                 .collect(Collectors.toList());
     }
 
@@ -55,7 +53,6 @@ public class AuthPrincipal implements Authentication {
         userInfo.put("email", user.getEmail());
         userInfo.put("fullName", user.getFullName());
         userInfo.put("avatar", user.getAvatar());
-        // userInfo.put("phone", user.getPhone()); // User chưa có field phone, tạm bỏ qua
         return userInfo;
     }
 }

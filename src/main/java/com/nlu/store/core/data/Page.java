@@ -28,7 +28,7 @@ public interface Page<T> extends Iterable<T> {
      *
      * @return a {@code Collection<T>} containing the elements of the current page
      */
-    Collection<T> getContent();
+    List<T> getContent();
 
     /**
      * Retrieves the current page number (zero-based index).

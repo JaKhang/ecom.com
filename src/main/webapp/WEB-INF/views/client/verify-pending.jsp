@@ -3,11 +3,11 @@
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="t" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="sec" tagdir="/WEB-INF/tags/auth" %>
+<%@ taglib prefix="jw" uri="/WEB-INF/jwire.tld" %>
 
 <fmt:message key="verify.pending.title" var="pageTitle"/>
 
 <t:layout title="${pageTitle}">
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js"></script>
     <section class="section-box shop-template mt-60">
         <div class="container">
             <div class="row mb-100">
@@ -16,7 +16,7 @@
                 <div class="col-lg-6 text-center">
                     <!-- Icon Email (Dùng ảnh có sẵn của theme hoặc icon font) -->
                     <div class="mb-30">
-                        <img src="<c:url value='/static/imgs/template/icons/email-sent.svg'/>"
+                        <img src="<c:url value='/static/client/imgs/template/icons/email-sent.svg'/>"
                              alt="Email Sent" style="width: 80px; opacity: 0.7;">
                     </div>
 
@@ -49,30 +49,7 @@
                     </c:if>
 
                     <div class="mt-40">
-                        <!-- Khởi tạo Alpine với thời gian từ Server -->
-                        <div x-data="timerLogic(20)" x-init="startCountdown()">
-
-                            <a href="<c:url value='/verify/resend'/>"
-                               class="btn btn-buy w-auto font-md-bold"
-
-                            :class="{ 'disabled': timeLeft > 0 }"
-
-                            :style="timeLeft > 0 ? 'pointer-events: none; opacity: 0.5;' : ''"
-
-                            @click="handleClick($event)">
-
-                            <span x-show="timeLeft === 0">
-            <fmt:message key="verify.pending.btn_resend"/>
-        </span>
-
-                            <!-- Hiển thị khi Đang đếm ngược -->
-                            <span x-show="timeLeft > 0" x-cloak>
-            <fmt:message key="verify.pending.btn_resend"/>
-            (<span x-text="timeLeft"></span>s)
-        </span>
-                            </a>
-
-                        </div>
+                        <jw:jawire component="com.nlu.store.modules.user.controllers.ResendVerifyComponent"/>
                     </div>
 
                     <div class="mt-20">
@@ -89,6 +66,7 @@
             </div>
         </div>
     </section>
+
     <script>
         function timerLogic(serverSeconds) {
             return {
@@ -107,24 +85,18 @@
                 },
 
                 handleClick(e) {
-                    // Nếu còn thời gian thì chặn chuyển trang
+                    // Logic phụ: Chặn chuyển trang nếu timeLeft > 0
+                    // (Thực tế dòng :style='pointer-events: none' đã chặn rồi, đây là lớp bảo vệ thứ 2)
                     if (this.timeLeft > 0) {
-                        return;
+                        e.preventDefault();
                     }
-                    // Nếu hết giờ -> Chuyển trang (Reload để gọi Server)
-                    window.location.href = e.currentTarget.href;
                 }
             }
         }
     </script>
 
     <style>
-        [x-cloak] {
-            display: none !important;
-        }
-
-        .cursor-not-allowed {
-            cursor: not-allowed !important;
-        }
+        /* Ẩn nội dung khi Alpine chưa load xong để tránh giật giao diện */
+        [x-cloak] { display: none !important; }
     </style>
 </t:layout>

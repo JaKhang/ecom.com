@@ -28,8 +28,6 @@ public class User extends AbstractModel implements Serializable {
     private LocalDateTime resetPasswordTokenExpiredAt;
 
 
-    // Represents the relationship from 'users_roles'
-    // Initialized to empty list to avoid NullPointerException
     private List<Role> roles = new ArrayList<>();
 
     @Builder
