@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$APPLICATION_CONFIG_DIR$/consoles/db/f8ddedc0-5859-448e-a6bb-74dfc3df2236/console.sql" value="f8ddedc0-5859-448e-a6bb-74dfc3df2236" />
+    <file url="file://$PROJECT_DIR$/database/database.sql" value="f8ddedc0-5859-448e-a6bb-74dfc3df2236" />
+    <file url="file://$PROJECT_DIR$/database/seed.sql" value="f8ddedc0-5859-448e-a6bb-74dfc3df2236" />
+    <file url="file://$PROJECT_DIR$/src/main/java/com/nlu/store/modules/catalog/dao/ProductDAOImpl.java" value="f8ddedc0-5859-448e-a6bb-74dfc3df2236" />
+    <file url="file://$PROJECT_DIR$/src/main/java/com/nlu/store/modules/catalog/dao/ReviewDaoImpl.java" value="f8ddedc0-5859-448e-a6bb-74dfc3df2236" />
+    <file url="file://$PROJECT_DIR$/src/main/java/com/nlu/store/modules/order/dao/DefaultOrderDao.java" value="f8ddedc0-5859-448e-a6bb-74dfc3df2236" />
+  </component>
+</project>
