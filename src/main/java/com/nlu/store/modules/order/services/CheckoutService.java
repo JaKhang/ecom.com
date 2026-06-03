@@ -7,4 +7,6 @@ import com.nlu.store.modules.order.dto.CheckoutRequest;
 public interface CheckoutService {
 
     CheckoutResult checkout(Cart cart, CheckoutRequest request, Authentication authentication);
+
+    void paymentSuccess(String transactionId, String orderRef);
 }

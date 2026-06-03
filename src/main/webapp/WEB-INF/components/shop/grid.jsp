@@ -197,7 +197,9 @@
         <!-- Product Grid -->
         <div class="row mt-20" style="transition: .5s">
             <c:forEach items="${component.data}" var="product">
-                <pro:product-card-grid product="${product}"/>
+                <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
+                    <pro:product-card-grid product="${product}"/>
+                </div>
             </c:forEach>
 
             <c:if test="${empty component.data}">

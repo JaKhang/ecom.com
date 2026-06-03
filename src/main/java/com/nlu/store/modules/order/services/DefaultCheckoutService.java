@@ -140,12 +140,22 @@ public class DefaultCheckoutService implements CheckoutService {
         // Save the order to the database
         orderDao.createOrderAndDecreaseStock(order);
 
-        String paymentGateway = paymentService.requestPayment(order.getPaymentMethod(), PaymentRequest.builder().build());
+        String paymentGateway = paymentService.requestPayment(order.getPaymentMethod(), PaymentRequest.builder()
+                .amount(order.getGrandTotal())
+                .orderRefence(order.getCode())
+                .build());
         return CheckoutResult.builder()
                 .paymentGetWay(paymentGateway)
                 .orderCode(order.getCode())
                 .build();
     }
+
+    @Override
+    public void paymentSuccess(String transactionId, String orderRef) {
+        orderDao.paymentSuccess(transactionId, orderRef);
+    }
+
+
 
     /**
      * Safe calculation of item total price.

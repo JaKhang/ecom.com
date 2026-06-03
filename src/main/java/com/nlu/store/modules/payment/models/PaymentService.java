@@ -1,11 +1,12 @@
 package com.nlu.store.modules.payment.models;
 
 import com.nlu.store.core.data.ULID;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.math.BigDecimal;
 import java.util.Map;
 
 public interface PaymentService {
     String requestPayment(PaymentMethod method, PaymentRequest request);
-    PaymentResult verify(PaymentMethod method, Map<String, String> params);
+    PaymentResult verify(PaymentMethod method, HttpServletRequest request);
 }

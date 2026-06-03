@@ -3,14 +3,14 @@
 <%@ taglib prefix="t" tagdir="/WEB-INF/tags/admin" %>
 <%@ taglib prefix="jw" uri="/WEB-INF/jwire.tld" %>
 
-<t:layout title="Trang chủ">
+<t:layout title="Reivew" active="reviews">
+    <section class="content-main">
     <div class="content-header">
         <div>
-            <h2 class="content-title card-title">Order List</h2>
-            <p>Lorem ipsum dolor sit amet.</p>
+            <h2 class="content-title card-title">Reviews</h2>
         </div>
-        <div>
-            <input class="form-control bg-white" type="text" placeholder="Search order ID">
-        </div>
+
     </div>
+    <jw:jawire component="com.nlu.store.modules.catalog.admin.AdminReviewComponent" id="review-table"/>
+
 </t:layout>

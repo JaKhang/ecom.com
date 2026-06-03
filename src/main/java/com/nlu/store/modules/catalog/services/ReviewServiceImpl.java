@@ -4,6 +4,7 @@ package com.nlu.store.modules.catalog.services;
 import com.nlu.store.core.data.Page;
 import com.nlu.store.core.data.Pageable;
 import com.nlu.store.core.data.ULID;
+import com.nlu.store.core.exceptions.ResourceNotFoundException;
 import com.nlu.store.modules.catalog.dao.ReviewDAO;
 import com.nlu.store.modules.catalog.dto.ReviewRequest;
 import com.nlu.store.modules.catalog.model.review.Review;
@@ -12,7 +13,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.util.List;
-import java.util.Optional;
 
 @ApplicationScoped
 public class ReviewServiceImpl implements ReviewService{
@@ -45,5 +45,26 @@ public class ReviewServiceImpl implements ReviewService{
                 .status(ReviewStatus.PENDING)
                 .build();
         return reviewDAO.create(review);
+    }
+
+    @Override
+    public void verify(ULID reviewId) {
+        Review review = reviewDAO.findById(reviewId).orElseThrow(() -> new ResourceNotFoundException("review.notfount"));
+        review.setVerified(true);
+        reviewDAO.update(review);
+    }
+
+    @Override
+    public void updateStatus(ULID reviewId, ReviewStatus status) {
+        System.out.println(reviewId);
+        Review review = reviewDAO.findById(reviewId).orElseThrow(() -> new ResourceNotFoundException("review.notfount"));
+        review.setStatus(status);
+        reviewDAO.update(review);
+        reviewDAO.recalcRating(review.getProductId());
+    }
+
+    @Override
+    public Page<Review> find(Pageable page, String keyword, ReviewStatus status) {
+        return reviewDAO.find(page, keyword, status);
     }
 }

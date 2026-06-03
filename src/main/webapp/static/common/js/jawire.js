@@ -168,7 +168,7 @@ class JWire {
         if (target.multiple) {
             value = Array.from(target.selectedOptions).map(option => option.value);
         } else {
-            value = target.value;
+            value = value === 'null' ? null : target.value;
         }
 
         const delay = this.getDebounceDelay(target);

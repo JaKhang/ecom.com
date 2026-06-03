@@ -13,4 +13,6 @@ public interface CategoryService {
     Optional<SimpleCategory> findBySlug(String slug);
 
     Optional<SimpleCategory> findById(ULID categoryId);
+
+    List<SimpleCategory> findByProductId(ULID id);
 }

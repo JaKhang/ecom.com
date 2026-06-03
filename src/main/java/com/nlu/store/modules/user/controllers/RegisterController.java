@@ -15,7 +15,10 @@ import jakarta.servlet.annotation.WebServlet;
 import java.util.HashMap;
 import java.util.Map;
 
-@WebServlet("/register")
+@WebServlet(urlPatterns = {
+        "/register",
+        "/dang-ky"
+})
 public class RegisterController extends AbstractController {
 
     @Inject

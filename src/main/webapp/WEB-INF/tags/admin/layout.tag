@@ -1,6 +1,7 @@
 <%@ tag description="Main Layout" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ attribute name="title" required="true" type="java.lang.String" %>
+<%@ attribute name="active" required="false" type="java.lang.String" %>
 <%@ attribute name="css" fragment="true" required="false" %>
 <%@ attribute name="js" fragment="true" required="false" %>
 

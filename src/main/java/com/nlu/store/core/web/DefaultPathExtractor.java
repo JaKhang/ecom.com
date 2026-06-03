@@ -50,6 +50,7 @@ public class DefaultPathExtractor implements PathExtractor {
             } catch (IllegalArgumentException e) {
                 // The specified group name does not exist in the pattern
                 // This happens if the template doesn't contain the requested variable name
+                e.printStackTrace();
                 return null;
             }
         }
@@ -92,7 +93,7 @@ public class DefaultPathExtractor implements PathExtractor {
                 regexBuilder.append("[^/]+");
             }
             else if (segment.startsWith("{") && segment.endsWith("}")) {
-                // Named Group support: {id} -> (?<id>[^/]+)
+                // Named Group support: {id} -> (?<id>  [^/]+)
                 String varName = segment.substring(1, segment.length() - 1);
 
                 // CRITICAL FIX: Do NOT use Pattern.quote() inside the group name syntax (?<name>...)

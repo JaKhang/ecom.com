@@ -76,7 +76,9 @@ public class JawireServlet extends AbstractController {
             component.setHttpContext(ctx);
 
             // Lifecycle: Boot
+            component.authorize(ctx.authentication());
             component.boot();
+
 
             // Restore state (Hydrate)
             String data = snapshotNode.path("data").asText();
@@ -118,9 +120,10 @@ public class JawireServlet extends AbstractController {
                 ));
             } else {
                 ctx.setStatus(500);
+                e.printStackTrace();
                 ctx.sendRestResponse(new ExceptionResponse(
                         "Unknown",
-                        e.getMessage(),
+                        ctx.getMessage("server.error"),
                         500
                 ));
             }

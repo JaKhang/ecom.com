@@ -30,18 +30,24 @@ public class CategoryDAOImpl implements CategoryDAO {
 
     @Override
     public Optional<SimpleCategory> findBySlug(String slug) {
-        String sql = SELECT_SIMPLE_SQL + " AND c.slug = ?";
+        String sql = SELECT_SIMPLE_SQL + "WHERE c.deleted_at IS NULL AND c.slug = ?";
         return jdbc.queryForObject(sql, mapper, slug);
     }
 
     @Override
     public Optional<SimpleCategory> findById(ULID id) {
-        String sql = SELECT_SIMPLE_SQL + " AND c.id = ?";
+        String sql = SELECT_SIMPLE_SQL + " WHERE c.deleted_at IS NULL AND c.id = ?";
         return jdbc.queryForObject(sql, mapper, id);
     }
 
+    @Override
+    public List<SimpleCategory> findByProductId(ULID id) {
+        String sql = SELECT_SIMPLE_SQL + " LEFT JOIN products_categories pc ON c.id = pc.category_id WHERE c.deleted_at IS NULL AND pc.product_id = ?";
+        return jdbc.queryForList(sql, mapper, id);
+    }
 
-    private static final String SELECT_SIMPLE_SQL = "SELECT c.id AS c_id, c.created_at AS c_created_at, c.updated_at AS c_updated_at, c.name AS c_name, c.slug AS c_slug, c.icon AS c_icon, c.products_count AS c_products_count FROM categories c WHERE c.deleted_at IS NULL";
+
+    private static final String SELECT_SIMPLE_SQL = "SELECT c.id AS c_id, c.created_at AS c_created_at, c.updated_at AS c_updated_at, c.name AS c_name, c.slug AS c_slug, c.icon AS c_icon, c.products_count AS c_products_count FROM categories c ";
 
 
 }

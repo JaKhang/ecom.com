@@ -298,9 +298,14 @@
                                             </c:otherwise>
                                         </c:choose>
                                     </span><br>
-                                    <fmt:message key="details.label.category"/>:<span
-                                        class="color-gray-500"> </span><br>
-                                    <fmt:message key="details.label.tags"/>:<span class="color-gray-500"> </span>
+                                    <span jw-ignore>
+                                        <fmt:message key="details.label.category"/>:
+                                        <c:if test="${categories != null}">
+                                            <c:forEach var="cas" items="${categories}">
+                                                <span class="color-gray-500">${cas.name}</span>
+                                            </c:forEach>
+                                        </c:if></span>
+                                    <br>
                                 </span>
                     </div>
                     <div class="col-lg-4 col-md-4 mb-20">

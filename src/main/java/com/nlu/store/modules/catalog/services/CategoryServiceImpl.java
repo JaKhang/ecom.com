@@ -59,6 +59,11 @@ public class CategoryServiceImpl implements CategoryService {
         return  categoryDAO.findById(categoryId);
     }
 
+    @Override
+    public List<SimpleCategory> findByProductId(ULID id) {
+        return categoryDAO.findByProductId(id);
+    }
+
     private String buildCacheKey(Sort sort) {
         if (sort == null || sort.isUnsorted()) {
             return CACHE_PREFIX + ":DEFAULT";

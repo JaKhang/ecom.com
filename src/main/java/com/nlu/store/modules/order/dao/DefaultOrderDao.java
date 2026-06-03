@@ -2,9 +2,7 @@ package com.nlu.store.modules.order.dao;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nlu.store.core.data.Page;
-import com.nlu.store.core.data.Pageable;
-import com.nlu.store.core.data.ULID;
+import com.nlu.store.core.data.*;
 import com.nlu.store.core.jdbc.DataAccessException;
 import com.nlu.store.core.jdbc.JdbcOperations;
 import com.nlu.store.core.jdbc.sql.JdbcParamBuilder;
@@ -12,9 +10,7 @@ import com.nlu.store.core.jdbc.sql.SqlBuilder;
 import com.nlu.store.core.jdbc.sql.WhereBuilder;
 import com.nlu.store.modules.order.mappers.OrderItemsMapExtractor;
 import com.nlu.store.modules.order.mappers.OrderMapper;
-import com.nlu.store.modules.order.models.Order;
-import com.nlu.store.modules.order.models.OrderItem;
-import com.nlu.store.modules.order.models.ShippingDetails;
+import com.nlu.store.modules.order.models.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -22,9 +18,12 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @ApplicationScoped
 public class DefaultOrderDao implements OrderDao {
+
+
     private final JdbcOperations jdbc;
     private final ObjectMapper mapper;
 
@@ -180,37 +179,77 @@ public class DefaultOrderDao implements OrderDao {
     @Override
     public Page<Order> findOrderByUserId(ULID userId, Pageable pageable) {
         // 1. Prepare SQL for counting total records (for pagination)
-        String countSql = "SELECT COUNT(*) FROM orders o WHERE user_id = ?";
+        String countSql = "SELECT COUNT(*) FROM orders o WHERE o.user_id = ?";
 
         // 2. Prepare SQL for fetching orders with shipping details
         String sql = SELECT_ORDER_SQL + " WHERE o.user_id = ?";
 
-        // 3. Execute the main query using OrderMapper (maps 'o_' to Order, 'os_' to ShippingDetails)
-        Page<Order> orders = jdbc.queryForPage(sql, countSql, pageable, new OrderMapper("o_", "os_"), userId);
+        return find(sql, countSql, pageable, userId);
+    }
+
+    @Override
+    public void paymentSuccess(String transactionId, String orderRef) {
+        LocalDateTime now = LocalDateTime.now();
+        SqlBuilder.UpdateBuilder update = SqlBuilder.update("orders")
+                .set("paid_at", now)
+                .set("transaction_ref", transactionId)
+                .set("payment_status", PaymentStatus.PAID)
+                .where("code", orderRef);
+        jdbc.update(update.getSql(), update.getParams());
+    }
+
+    @Override
+    public Page<Order> find(Pageable pageable, OrderStatus status, PaymentStatus paymentStatus) {
+        // 1. Prepare SQL for counting total records (for pagination)
+        String countSql = "SELECT COUNT(*) FROM orders o";
+
+        // 2. Prepare SQL for fetching orders with shipping details
+
+        return find(SELECT_ORDER_SQL, countSql, pageable);
+    }
+
+    @Override
+    public Optional<Order> findById(ULID id) {
+        // 1. Prepare SQL for counting total records (for pagination)
+        String countSql = "SELECT COUNT(*) FROM orders o WHERE o.id = ?";
+
+        // 2. Prepare SQL for fetching orders with shipping details
+        String sql = SELECT_ORDER_SQL + " WHERE o.id = ?";
+
+        Pageable pageable = new PageRequest(1,1, Sort.UNSORTED);
+        Page<Order> orders = find(sql, countSql, pageable, id);
+        System.out.println(orders);
+        return orders.getContent().stream().findAny();
+    }
+
+    private Page<Order> find(String select, String count, Pageable pageable, Object... parms) {
+
+
+        // 1. Execute the main query using OrderMapper (maps 'o_' to Order, 'os_' to ShippingDetails)
+        Page<Order> orders = jdbc.queryForPage(select, count, pageable, new OrderMapper("o_", "os_"), parms);
 
         // Optimization: If no orders found, return immediately to avoid unnecessary DB calls
         if (orders.getContent().isEmpty()) {
             return orders;
         }
 
-        // 4. Collect list of Order IDs to fetch associated items
+        // 2. Collect list of Order IDs to fetch associated items
         List<ULID> orderIds = orders.getContent().stream()
                 .map(Order::getId)
                 .toList();
 
-        // 5. Build query to fetch items for these orders
-        // BUG FIX: Changed "oi.id" to "oi.order_id" to correctly link items to orders
+        // 3. Build query to fetch items for these orders
         WhereBuilder selectItemBuilder = WhereBuilder.create(SELECT_ITEM_SQL)
                 .andIn("oi.order_id", orderIds);
 
-        // 6. Execute item query and map results (grouped by Order ID)
+        // 4. Execute item query and map results (grouped by Order ID)
         Map<ULID, List<OrderItem>> orderItems = jdbc.executeQuery(
                 selectItemBuilder.getSql(),
                 new OrderItemsMapExtractor("oi_"),
                 selectItemBuilder.getParams()
         ).orElse(Collections.emptyMap());
 
-        // 7. Attach items to their respective orders
+        // 5. Attach items to their respective orders
         // Note: Assuming Page implements Iterable, otherwise use orders.getContent().forEach(...)
         orders.forEach(order ->
                 order.setItems(orderItems.getOrDefault(order.getId(), Collections.emptyList()))
@@ -218,7 +257,6 @@ public class DefaultOrderDao implements OrderDao {
 
         return orders;
     }
-
 
 
     private static final String SELECT_ORDER_SQL = "SELECT o.id AS o_id, o.code AS o_code, o.user_id AS o_user_id, o.status AS o_status, o.cancel_reason AS o_cancel_reason, o.payment_method AS o_payment_method, o.payment_status AS o_payment_status, o.transaction_ref AS o_transaction_ref, o.paid_at AS o_paid_at, o.currency AS o_currency, o.sub_total AS o_sub_total, o.shipping_fee AS o_shipping_fee, o.discount_amount AS o_discount_amount, o.coupon_code AS o_coupon_code, o.grand_total AS o_grand_total, o.note AS o_note, o.ip_address AS o_ip_address, o.user_agent AS o_user_agent, o.created_at AS o_created_at, o.updated_at AS o_updated_at, os.id AS os_id, os.contact_name AS os_contact_name, os.contact_phone AS os_contact_phone, os.contact_email AS os_contact_email, os.province AS os_province, os.district AS os_district, os.ward AS os_ward, os.address_detail AS os_address_detail, os.full_address AS os_full_address, os.province_code AS os_province_code, os.district_code AS os_district_code, os.ward_code AS os_ward_code, os.carrier_name AS os_carrier_name, os.tracking_code AS os_tracking_code, os.estimated_delivery_date AS os_estimated_delivery_date, os.shipping_note AS os_shipping_note FROM orders o LEFT JOIN order_shipping os ON o.id = os.order_id";

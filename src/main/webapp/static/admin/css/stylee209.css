@@ -999,7 +999,7 @@ textarea.form-control {
 .icontext small, .icontext .title {
   display: block;
 }
-.icontext span {
+.icontext .span {
   font-size: 22px;
   font-weight: 600;
   display: block;

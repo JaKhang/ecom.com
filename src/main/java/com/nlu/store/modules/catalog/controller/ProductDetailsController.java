@@ -8,9 +8,11 @@ import com.nlu.store.core.exceptions.ResourceNotFoundException;
 import com.nlu.store.core.web.AbstractController;
 import com.nlu.store.core.web.Authentication;
 import com.nlu.store.core.web.HttpContext;
+import com.nlu.store.modules.catalog.model.SimpleCategory;
 import com.nlu.store.modules.catalog.model.SimpleProduct;
 import com.nlu.store.modules.catalog.model.details.ProductSpecs;
 import com.nlu.store.modules.catalog.model.review.Review;
+import com.nlu.store.modules.catalog.services.CategoryService;
 import com.nlu.store.modules.catalog.services.ProductService;
 import com.nlu.store.modules.catalog.services.ReviewService;
 import jakarta.inject.Inject;
@@ -22,7 +24,8 @@ import java.util.List;
 public class ProductDetailsController extends AbstractController {
     @Inject
     private ProductService productService;
-
+    @Inject
+    private CategoryService categoryService;
     @Inject
     private ReviewService reviewService;
 
@@ -32,6 +35,7 @@ public class ProductDetailsController extends AbstractController {
         String slug = ctx.getPathVariable("/products|san-pham/{slug}", "slug");
         SimpleProduct simpleProduct = productService.findBySlug(slug).orElseThrow(() -> new ResourceNotFoundException("product.notfound"));
         List<ProductSpecs> productSpecs = productService.findProductSpecs(simpleProduct.getId());
+        List<SimpleCategory> categories = categoryService.findByProductId(simpleProduct.getId());
 
         if (ctx.isAuthenticated()){
             Authentication authentication = ctx.authentication();
@@ -41,6 +45,7 @@ public class ProductDetailsController extends AbstractController {
 
 
         ctx.setAttribute("product", simpleProduct);
+        ctx.setAttribute("categories", categories);
         ctx.setAttribute("productSpecs", productSpecs);
         ctx.view("client/shop/details");
     }

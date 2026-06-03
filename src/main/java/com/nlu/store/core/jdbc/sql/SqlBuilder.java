@@ -15,6 +15,10 @@ public class SqlBuilder {
     public static InsertBuilder insert(String tableName) {
         return new InsertBuilder(tableName);
     }
+    public static UpdateBuilder update(String tableName) {
+        return new UpdateBuilder(tableName);
+    }
+
 
     // =========================================================================
     // INSERT BUILDER
@@ -65,4 +69,66 @@ public class SqlBuilder {
             return values.toArray();
         }
     }
+
+    public static class UpdateBuilder {
+        private final String tableName;
+        private final List<String> setClauses = new ArrayList<>();
+        private final List<Object> setValues = new ArrayList<>();
+        private final List<String> whereClauses = new ArrayList<>();
+        private final List<Object> whereValues = new ArrayList<>();
+
+        public UpdateBuilder(String tableName) {
+            this.tableName = tableName;
+        }
+
+        // Gán giá trị cho cột: SET column = value
+        public UpdateBuilder set(String columnName, Object value) {
+            this.setClauses.add(columnName + " = ?");
+            this.setValues.add(value);
+            return this;
+        }
+
+        // Điều kiện bằng: WHERE column = value
+        public UpdateBuilder where(String columnName, Object value) {
+            this.whereClauses.add(columnName + " = ?");
+            this.whereValues.add(value);
+            return this;
+        }
+
+        // Điều kiện tùy chỉnh: WHERE age > ?
+        public UpdateBuilder whereCondition(String condition, Object value) {
+            this.whereClauses.add(condition);
+            this.whereValues.add(value);
+            return this;
+        }
+
+        // Điều kiện không tham số: WHERE is_active = 1
+        public UpdateBuilder whereSql(String condition) {
+            this.whereClauses.add(condition);
+            return this;
+        }
+
+        public String getSql() {
+            if (setClauses.isEmpty()) {
+                throw new IllegalStateException("No columns defined for UPDATE");
+            }
+
+            StringBuilder sql = new StringBuilder();
+            sql.append("UPDATE ").append(tableName).append(" SET ");
+            sql.append(String.join(", ", setClauses));
+
+            if (!whereClauses.isEmpty()) {
+                sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
+            }
+
+            return sql.toString();
+        }
+
+        public Object[] getParams() {
+            List<Object> allParams = new ArrayList<>(setValues);
+            allParams.addAll(whereValues);
+            return allParams.toArray();
+        }
+    }
+
 }

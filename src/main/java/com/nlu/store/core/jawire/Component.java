@@ -8,6 +8,7 @@ import com.nlu.store.core.data.ULID;
 import com.nlu.store.core.utils.ReflectionUtils;
 import com.nlu.store.core.validation.ValidateResult;
 import com.nlu.store.core.validation.Validator;
+import com.nlu.store.core.web.Authentication;
 import com.nlu.store.core.web.HttpContext;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
@@ -276,6 +277,9 @@ public abstract class Component implements Serializable {
             throw new IllegalStateException("JWire: ObjectMapper is null. " +
                     "Ensure the component is managed by CDI or mapper is manually injected.");
         }
+    }
+
+    protected void authorize(Authentication authentication){
     }
 
     // --- DTO ---
