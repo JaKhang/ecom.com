@@ -62,6 +62,7 @@ CREATE TABLE `users_roles`
   COLLATE = utf8mb4_unicode_ci;
 
 
+
 -- ============================================================
 -- 2. CATALOG BASE (BRANDS & CATEGORIES)
 -- ============================================================
@@ -454,120 +455,133 @@ DROP TABLE IF EXISTS `order_shipping`;
 DROP TABLE IF EXISTS `orders`;
 
 -- 1. Bảng Orders: Quản lý trạng thái, tài chính và đối soát
-CREATE TABLE `orders` (
-                          `id`                CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
-                          `code`              VARCHAR(32) NOT NULL, -- VD: #ORD-2401-X92A
-                          `user_id`           CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NULL,
+CREATE TABLE `orders`
+(
+    `id`              CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci                                                     NOT NULL,
+    `code`            VARCHAR(32)                                                                                               NOT NULL,           -- VD: #ORD-2401-X92A
+    `user_id`         CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci                                                     NULL,
 
     -- Trạng thái đơn hàng
-                          `status`            ENUM('pending', 'confirmed', 'processing', 'shipping', 'delivered', 'cancelled', 'returned', 'refunded') NOT NULL DEFAULT 'pending',
-                          `cancel_reason`     VARCHAR(255) NULL, -- Lưu lý do hủy đơn (VD: Khách đổi ý, Hết hàng)
+    `status`          ENUM ('pending', 'confirmed', 'processing', 'shipping', 'delivered', 'cancelled', 'returned', 'refunded') NOT NULL DEFAULT 'pending',
+    `cancel_reason`   VARCHAR(255)                                                                                              NULL,               -- Lưu lý do hủy đơn (VD: Khách đổi ý, Hết hàng)
 
     -- Thanh toán & Đối soát
-                          `payment_method`    VARCHAR(50) NOT NULL, -- 'cod', 'banking', 'vnpay', 'momo'
-                          `payment_status`    ENUM('unpaid', 'paid', 'refunded', 'partial_refund') NOT NULL DEFAULT 'unpaid',
-                          `transaction_ref`   VARCHAR(100) NULL, -- Mã giao dịch từ cổng thanh toán (VD: VNPAY_123456)
-                          `paid_at`           TIMESTAMP NULL,    -- Thời điểm thanh toán thành công
+    `payment_method`  VARCHAR(50)                                                                                               NOT NULL,           -- 'cod', 'banking', 'vnpay', 'momo'
+    `payment_status`  ENUM ('unpaid', 'paid', 'refunded', 'partial_refund')                                                     NOT NULL DEFAULT 'unpaid',
+    `transaction_ref` VARCHAR(100)                                                                                              NULL,               -- Mã giao dịch từ cổng thanh toán (VD: VNPAY_123456)
+    `paid_at`         TIMESTAMP                                                                                                 NULL,               -- Thời điểm thanh toán thành công
 
     -- Tài chính
-                          `currency`          CHAR(3) NOT NULL DEFAULT 'VND',
-                          `sub_total`         DECIMAL(15, 2) NOT NULL DEFAULT 0, -- Tổng tiền hàng
-                          `shipping_fee`      DECIMAL(15, 2) NOT NULL DEFAULT 0,
-                          `discount_amount`   DECIMAL(15, 2) NOT NULL DEFAULT 0,
-                          `coupon_code`       VARCHAR(50) NULL, -- Mã giảm giá đã dùng (để tracking marketing)
-                          `grand_total`       DECIMAL(15, 2) NOT NULL DEFAULT 0, -- = Sub + Ship - Discount
+    `currency`        CHAR(3)                                                                                                   NOT NULL DEFAULT 'VND',
+    `sub_total`       DECIMAL(15, 2)                                                                                            NOT NULL DEFAULT 0, -- Tổng tiền hàng
+    `shipping_fee`    DECIMAL(15, 2)                                                                                            NOT NULL DEFAULT 0,
+    `discount_amount` DECIMAL(15, 2)                                                                                            NOT NULL DEFAULT 0,
+    `coupon_code`     VARCHAR(50)                                                                                               NULL,               -- Mã giảm giá đã dùng (để tracking marketing)
+    `grand_total`     DECIMAL(15, 2)                                                                                            NOT NULL DEFAULT 0, -- = Sub + Ship - Discount
 
     -- Thông tin bổ sung
-                          `note`              TEXT NULL, -- Ghi chú khách hàng
-                          `ip_address`        VARCHAR(45) NULL, -- IP đặt hàng (chống spam/fraud)
-                          `user_agent`        VARCHAR(255) NULL, -- Thiết bị đặt hàng
+    `note`            TEXT                                                                                                      NULL,               -- Ghi chú khách hàng
+    `ip_address`      VARCHAR(45)                                                                                               NULL,               -- IP đặt hàng (chống spam/fraud)
+    `user_agent`      VARCHAR(255)                                                                                              NULL,               -- Thiết bị đặt hàng
 
-                          `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                          `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `created_at`      TIMESTAMP                                                                                                 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`      TIMESTAMP                                                                                                 NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-                          PRIMARY KEY (`id`),
-                          UNIQUE KEY `idx_orders_code` (`code`),
-                          KEY `idx_orders_user` (`user_id`),
-                          KEY `idx_orders_status` (`status`),
-                          KEY `idx_orders_created` (`created_at`), -- Index cho báo cáo doanh thu theo ngày
-                          KEY `idx_orders_transaction` (`transaction_ref`), -- Tìm kiếm nhanh theo mã giao dịch
-                          CONSTRAINT `fk_orders_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_orders_code` (`code`),
+    KEY `idx_orders_user` (`user_id`),
+    KEY `idx_orders_status` (`status`),
+    KEY `idx_orders_created` (`created_at`),                                                                                                        -- Index cho báo cáo doanh thu theo ngày
+    KEY `idx_orders_transaction` (`transaction_ref`),                                                                                               -- Tìm kiếm nhanh theo mã giao dịch
+    CONSTRAINT `fk_orders_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
 
 -- 2. Bảng Shipping: Tách biệt để quản lý Logistics
-CREATE TABLE `order_shipping` (
-                                  `id`                CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
-                                  `order_id`          CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+CREATE TABLE `order_shipping`
+(
+    `id`                      CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+    `order_id`                CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
 
     -- Thông tin người nhận
-                                  `contact_name`      VARCHAR(100) NOT NULL,
-                                  `contact_phone`     VARCHAR(20) NOT NULL,
-                                  `contact_email`     VARCHAR(255) NULL,
+    `contact_name`            VARCHAR(100)                                          NOT NULL,
+    `contact_phone`           VARCHAR(20)                                           NOT NULL,
+    `contact_email`           VARCHAR(255)                                          NULL,
 
     -- Địa chỉ (Snapshot text để in phiếu giao hàng nhanh)
-                                  `address_detail`    VARCHAR(255) NOT NULL,
-                                  `ward`              VARCHAR(100) NOT NULL,
-                                  `district`          VARCHAR(100) NOT NULL,
-                                  `province`          VARCHAR(100) NOT NULL,
-                                  `full_address`      TEXT NOT NULL, -- Ghép sẵn để hiển thị: "144 Xuân Thủy, Cầu Giấy..."
+    `address_detail`          VARCHAR(255)                                          NOT NULL,
+    `ward`                    VARCHAR(100)                                          NOT NULL,
+    `district`                VARCHAR(100)                                          NOT NULL,
+    `province`                VARCHAR(100)                                          NOT NULL,
+    `full_address`            TEXT                                                  NOT NULL, -- Ghép sẵn để hiển thị: "144 Xuân Thủy, Cầu Giấy..."
 
     -- Mã định danh địa lý (để tính phí ship lại nếu cần)
-                                  `province_code`     VARCHAR(20) NULL,
-                                  `district_code`     VARCHAR(20) NULL,
-                                  `ward_code`         VARCHAR(20) NULL,
+    `province_code`           VARCHAR(20)                                           NULL,
+    `district_code`           VARCHAR(20)                                           NULL,
+    `ward_code`               VARCHAR(20)                                           NULL,
 
     -- Tracking vận chuyển (Logistics)
-                                  `carrier_name`      VARCHAR(50) NULL, -- VD: GHTK, GHN, ViettelPost
-                                  `tracking_code`     VARCHAR(50) NULL, -- Mã vận đơn
-                                  `estimated_delivery_date` DATE NULL,
-                                  `shipping_note`     VARCHAR(255) NULL, -- Ghi chú cho shipper (VD: Gọi trước khi giao)
+    `carrier_name`            VARCHAR(50)                                           NULL,     -- VD: GHTK, GHN, ViettelPost
+    `tracking_code`           VARCHAR(50)                                           NULL,     -- Mã vận đơn
+    `estimated_delivery_date` DATE                                                  NULL,
+    `shipping_note`           VARCHAR(255)                                          NULL,     -- Ghi chú cho shipper (VD: Gọi trước khi giao)
 
-                                  PRIMARY KEY (`id`),
-                                  UNIQUE KEY `idx_os_order` (`order_id`),
-                                  KEY `idx_os_tracking` (`tracking_code`),
-                                  CONSTRAINT `fk_os_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_os_order` (`order_id`),
+    KEY `idx_os_tracking` (`tracking_code`),
+    CONSTRAINT `fk_os_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
 
 -- 3. Bảng Order Items: Lưu vết sản phẩm tại thời điểm mua
-CREATE TABLE `order_items` (
-                               `id`                CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
-                               `order_id`          CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
-                               `product_id`        CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NULL,
-                               `variant_id`        CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NULL,
+CREATE TABLE `order_items`
+(
+    `id`               CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+    `order_id`         CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+    `product_id`       CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NULL,
+    `variant_id`       CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NULL,
 
     -- Snapshot thông tin sản phẩm (Quan trọng khi SP bị xóa/sửa sau này)
-                               `product_name`      VARCHAR(255) NOT NULL,
-                               `sku`               VARCHAR(128) NOT NULL,
-                               `thumbnail`         VARCHAR(255) NULL,
+    `product_name`     VARCHAR(255)                                          NOT NULL,
+    `sku`              VARCHAR(128)                                          NOT NULL,
+    `thumbnail`        VARCHAR(255)                                          NULL,
 
     -- Snapshot thuộc tính biến thể (Quan trọng)
     -- VD: {"Color": "Titanium", "Storage": "256GB", "Ram": "8GB"}
-                               `variant_snapshot`  JSON NULL,
+    `variant_snapshot` JSON                                                  NULL,
 
-                               `quantity`          INT NOT NULL DEFAULT 1,
-                               `price`             DECIMAL(15, 2) NOT NULL, -- Giá bán tại thời điểm mua
-                               `total_price`       DECIMAL(15, 2) NOT NULL, -- = quantity * price (đã trừ discount dòng nếu có)
+    `quantity`         INT                                                   NOT NULL DEFAULT 1,
+    `price`            DECIMAL(15, 2)                                        NOT NULL, -- Giá bán tại thời điểm mua
+    `total_price`      DECIMAL(15, 2)                                        NOT NULL, -- = quantity * price (đã trừ discount dòng nếu có)
 
-                               PRIMARY KEY (`id`),
-                               KEY `idx_order_items_order` (`order_id`),
-                               CONSTRAINT `fk_oi_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-                               CONSTRAINT `fk_oi_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    PRIMARY KEY (`id`),
+    KEY `idx_order_items_order` (`order_id`),
+    CONSTRAINT `fk_oi_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_oi_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
 
 -- 4. Bảng History: Audit log
-CREATE TABLE `order_history` (
-                                 `id`            CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
-                                 `order_id`      CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+CREATE TABLE `order_history`
+(
+    `id`          CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+    `order_id`    CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
 
-                                 `action`        VARCHAR(50) NOT NULL, -- create, payment_success, ship, cancel
-                                 `prev_status`   VARCHAR(50) NULL,
-                                 `new_status`    VARCHAR(50) NULL,
-                                 `note`          VARCHAR(255) NULL, -- VD: "Hệ thống tự động hủy do quá hạn thanh toán"
+    `action`      VARCHAR(50)                                           NOT NULL, -- create, payment_success, ship, cancel
+    `prev_status` VARCHAR(50)                                           NULL,
+    `new_status`  VARCHAR(50)                                           NULL,
+    `note`        VARCHAR(255)                                          NULL,     -- VD: "Hệ thống tự động hủy do quá hạn thanh toán"
 
-                                 `created_by`    CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NULL, -- NULL = System/Customer, ID = Admin/Staff
-                                 `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `created_by`  CHAR(26) CHARACTER SET ascii COLLATE ascii_general_ci NULL,     -- NULL = System/Customer, ID = Admin/Staff
+    `created_at`  TIMESTAMP                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-                                 PRIMARY KEY (`id`),
-                                 KEY `idx_oh_order` (`order_id`),
-                                 CONSTRAINT `fk_oh_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    PRIMARY KEY (`id`),
+    KEY `idx_oh_order` (`order_id`),
+    CONSTRAINT `fk_oh_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
+

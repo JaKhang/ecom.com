@@ -74,6 +74,7 @@ public class CheckoutController extends AbstractController {
 
         List<SimpleVariant> variants = productService.findSimpleVariantsByIds(cart.getVariantIds());
         boolean isChanged = cart.refresh(variants);
+        ctx.setAttribute("isChanged", isChanged);
         if (isChanged) {
             String path = ctx.getMessage("routes.checkout", "checkout");
             ctx.alert(AlertType.WARNING, "checkout.price_changed");

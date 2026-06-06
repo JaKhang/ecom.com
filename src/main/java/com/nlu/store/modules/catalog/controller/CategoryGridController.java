@@ -18,7 +18,7 @@ public class CategoryGridController extends AbstractController {
     @Override
     protected void doGet(HttpContext ctx) {
         if (ctx.countRequestPathSegments() != 2) throw new ResourceNotFoundException("page.notfound");
-        String slug = ctx.getPathVariable("/categories|danh-muc/{slug}", "slug");
+        String slug = ctx.getPathVariable("/category|danh-muc/{slug}", "slug");
         SimpleCategory category = categoryService.findBySlug(slug).orElseThrow(() -> new ResourceNotFoundException("category.notfound"));
         System.out.println(category);
         ctx.setAttribute("category", category);
